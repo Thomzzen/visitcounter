@@ -1,4 +1,5 @@
 const countEl = document.getElementById('count');
+const co2 = document.getElementById('CO2');
 
 updateVisitCount();
 
@@ -7,5 +8,6 @@ function updateVisitCount() {
 	.then(res => res.json())
 	.then(res => {
 		countEl.innerHTML = res.value;
+		co2.innerHTML = res.value + res.value*50;
 	})
 }
