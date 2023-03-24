@@ -40,6 +40,7 @@ p {
   background-size: cover;
   animation: play 1.5s steps(3) infinite;
   display: inline-block;
+	margin-top: -5%;
 }
 
 @keyframes play {
@@ -59,7 +60,7 @@ header {
 
 #headTitle {
   color: white;
-  margin-top: 10%;
+  margin-top: 5%;
   font-weight: bold;
   font-family: 'Muli', sans-serif;
   font-size: 50px;
@@ -72,11 +73,43 @@ header {
   margin-top: 5%;
   font-family: 'Muli', sans-serif;
   font-size: 70%;
+	margin-bottom: 20%;
 
 }
 
+#calculation{
+	margin-top: 10%;
+	    text-align: center;
+
+
+}
+
+#underTitle{
+	display: flex;
+    flex-wrap: nowrap;
+    flex-direction: row;
+}
+
+#box-amsterdam{
+
+	width: 33%;
+}
+
+#amsterdam1{
+	width: 60%;
+	border-radius: 20%;
+    margin: 10%;
+		margin-left: 25%;
+}
+
+#amsterdam2{
+	width: 60%;
+	border-radius: 20%;
+    margin: 10%;
+}
+
 #title1 {
-  margin-top: 7%;
+
 }
 
 #title2 {}
@@ -103,24 +136,27 @@ header {
 }
 
 #place1 {
-  position: fixed;
-  left: 1vw;
-  margin-top: 1%;
+	position: relative;
+	margin-top: 1%;
+	margin-left: 1%;
 }
 
 #place2 {
-  position: fixed;
-  left: 92vw;
+  position: relative;
   margin-top: 1%;
+	margin-right: 1%;
 }
 
 #box {
-  display: flex;
-  flex-direction: row;
+	display: flex;
+flex-direction: row;
+width: 100%;
+flex-wrap: wrap;
+justify-content: space-between;
 }
 
 #line-box {
-  margin-top: -5%;
+  margin-top: -10%;
   width: 95%;
   display: flex;
   flex-direction: row;
