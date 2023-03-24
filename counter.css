@@ -82,7 +82,8 @@ margin-top:10%;
 
 #line{
 
-width: 92vw;;
+margin-left: 5%;
+margin-right: 5%;
 border-top: solid 1px white;
 
 }
@@ -119,6 +120,11 @@ border-top: solid 1px white;
 
 #line:after {
 	right: 10.5vw;
+}
+
+#line-box{
+
+	width: 95%;
 }
 
 
