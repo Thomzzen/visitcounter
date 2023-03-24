@@ -10,7 +10,7 @@ function updateVisitCount() {
 	.then(res => {
 		countEl.innerHTML = res.value;
 		var emission = res.value;
-		var co2Emission = res.value + res.value*2;
+		var co2Emission = res.value + res.value;
 		co2.innerHTML = co2Emission;
 		var procent = co2Emission/end*100;
 
