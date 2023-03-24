@@ -5,12 +5,12 @@ var end = 41343;
 updateVisitCount();
 
 function updateVisitCount() {
-	fetch('https://api.countapi.xyz/update/visits/counter/?amount=1')
+	fetch('https://api.countapi.xyz/update/counter2/emission2/?amount=1')
 	.then(res => res.json())
 	.then(res => {
 		countEl.innerHTML = res.value;
 		var emission = res.value;
-		var co2Emission = res.value + res.value*3;
+		var co2Emission = res.value + res.value*2;
 		co2.innerHTML = co2Emission;
 		var procent = co2Emission/end*100;
 
