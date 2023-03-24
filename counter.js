@@ -1,7 +1,6 @@
 const countEl = document.getElementById('count');
 const co2 = document.getElementById('CO2');
-
-
+var end = 41343;
 
 updateVisitCount();
 
@@ -11,9 +10,11 @@ function updateVisitCount() {
 	.then(res => {
 		countEl.innerHTML = res.value;
 		var emission = res.value;
-		co2.innerHTML = res.value + res.value*50;
+		var co2Emission = res.value + res.value*3;
+		co2.innerHTML = co2Emission;
+		var procent = co2Emission/end*100;
 
-
-document.getElementById("car").style.left = emission + "px";
+console.log(procent);
+document.getElementById("car").style.left = procent + "%";
 	})
 }
