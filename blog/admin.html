@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write a Post — Gadget Weekly</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> gadgetweekly.</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#archive">Archive</a>
+      <a href="admin.html" class="active">Write a post</a>
+    </div>
+    <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
+  </nav>
+
+  <div class="section-label" style="margin-top:18px;">
+    <span>Write this week's top 10</span>
+    <div class="line"></div>
+  </div>
+
+  <div class="admin-grid">
+
+    <div class="panel">
+      <h2>1. Pick a post</h2>
+      <div class="select-line">
+        <select id="postPicker"></select>
+        <button class="btn btn-outline" id="newPostBtn">New post</button>
+      </div>
+
+      <h2>2. Post details</h2>
+      <div class="two-col">
+        <div class="field">
+          <label>Week label</label>
+          <input type="text" id="f-weekLabel" placeholder="Week 38">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="f-title" placeholder="10 Fun & Handy Gadgets Worth Buying This Week">
+      </div>
+      <div class="field">
+        <label>Cover image URL</label>
+        <input type="text" id="f-cover" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label>Excerpt (short teaser shown on the homepage)</label>
+        <textarea id="f-excerpt" rows="2" placeholder="One or two sentences about this week's list."></textarea>
+      </div>
+
+      <h2 style="margin-top:28px;">3. The 10 gadgets</h2>
+      <div id="items"></div>
+      <button class="btn btn-outline" id="addItemBtn">+ Add a gadget</button>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="saveDraftBtn">Save draft (this browser)</button>
+        <button class="btn btn-outline" id="deleteDraftBtn">Delete this draft</button>
+        <button class="btn btn-primary" id="generateBtn">Generate code to publish</button>
+      </div>
+
+      <div id="codeBox" style="display:none; margin-top:20px;">
+        <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:8px;">
+          Paste this into posts.js
+        </label>
+        <textarea class="code-output" id="codeOutput" readonly></textarea>
+        <div class="actions-row">
+          <button class="btn btn-outline" id="copyCodeBtn">Copy code</button>
+        </div>
+        <p class="hint">
+          Open <code>blog/posts.js</code>, paste this object at the very top of the <code>POSTS = [ ... ]</code> array
+          (don't forget the comma after it), then save, commit and push. That's what makes the post live for everyone —
+          "Save draft" above only previews it in your own browser.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live preview</h2>
+      <div id="preview"></div>
+    </div>
+
+  </div>
+
+  <footer>Handpicked every week. Nothing sponsored unless we say so.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="posts.js"></script>
+<script src="app.js"></script>
+<script>
+  const itemsEl = document.getElementById("items");
+  const postPicker = document.getElementById("postPicker");
+  let editingId = null;
+
+  const fields = {
+    weekLabel: document.getElementById("f-weekLabel"),
+    date: document.getElementById("f-date"),
+    title: document.getElementById("f-title"),
+    cover: document.getElementById("f-cover"),
+    excerpt: document.getElementById("f-excerpt")
+  };
+
+  function slugify(str) {
+    return String(str || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function emptyItem() {
+    return { name: "", image: "", blurb: "", price: "", tag: "", link: "" };
+  }
+
+  function renderItemRow(item, index) {
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML = `
+      <button class="remove-item" type="button" title="Remove">&times; remove</button>
+      <div class="item-row-title">Gadget #${index + 1}</div>
+      <div class="two-col">
+        <div class="field"><label>Name</label><input type="text" class="i-name" value="${escapeHtml(item.name)}"></div>
+        <div class="field"><label>Price</label><input type="text" class="i-price" value="${escapeHtml(item.price)}" placeholder="$29"></div>
+      </div>
+      <div class="field"><label>Image URL</label><input type="text" class="i-image" value="${escapeHtml(item.image)}" placeholder="https://..."></div>
+      <div class="field"><label>Why it's worth it</label><textarea class="i-blurb" rows="2">${escapeHtml(item.blurb)}</textarea></div>
+      <div class="two-col">
+        <div class="field"><label>Tag (optional)</label><input type="text" class="i-tag" value="${escapeHtml(item.tag)}" placeholder="Editor's Pick"></div>
+        <div class="field"><label>Buy link</label><input type="text" class="i-link" value="${escapeHtml(item.link)}" placeholder="https://..."></div>
+      </div>
+    `;
+    row.querySelector(".remove-item").addEventListener("click", () => {
+      row.remove();
+      renumberRows();
+      updatePreview();
+    });
+    row.querySelectorAll("input, textarea").forEach(el => el.addEventListener("input", updatePreview));
+    return row;
+  }
+
+  function renumberRows() {
+    itemsEl.querySelectorAll(".item-row").forEach((row, i) => {
+      row.querySelector(".item-row-title").textContent = `Gadget #${i + 1}`;
+    });
+  }
+
+  function addItemRow(item) {
+    itemsEl.appendChild(renderItemRow(item || emptyItem(), itemsEl.children.length));
+  }
+
+  document.getElementById("addItemBtn").addEventListener("click", () => {
+    addItemRow();
+    updatePreview();
+  });
+
+  Object.values(fields).forEach(el => el.addEventListener("input", updatePreview));
+
+  function resetForm() {
+    editingId = null;
+    fields.weekLabel.value = "";
+    fields.date.value = new Date().toISOString().slice(0, 10);
+    fields.title.value = "";
+    fields.cover.value = "";
+    fields.excerpt.value = "";
+    itemsEl.innerHTML = "";
+    for (let i = 0; i < 10; i++) addItemRow();
+    document.getElementById("codeBox").style.display = "none";
+    updatePreview();
+  }
+
+  function loadPostIntoForm(post) {
+    editingId = post.id;
+    fields.weekLabel.value = post.weekLabel || "";
+    fields.date.value = post.date || "";
+    fields.title.value = post.title || "";
+    fields.cover.value = post.cover || "";
+    fields.excerpt.value = post.excerpt || "";
+    itemsEl.innerHTML = "";
+    (post.items || []).forEach(item => addItemRow(item));
+    while (itemsEl.children.length < 10) addItemRow();
+    document.getElementById("codeBox").style.display = "none";
+    updatePreview();
+  }
+
+  function buildPostFromForm() {
+    const items = Array.from(itemsEl.querySelectorAll(".item-row")).map((row, i) => ({
+      rank: i + 1,
+      name: row.querySelector(".i-name").value.trim(),
+      image: row.querySelector(".i-image").value.trim(),
+      blurb: row.querySelector(".i-blurb").value.trim(),
+      price: row.querySelector(".i-price").value.trim(),
+      tag: row.querySelector(".i-tag").value.trim(),
+      link: row.querySelector(".i-link").value.trim() || "#"
+    })).filter(item => item.name);
+
+    const weekLabel = fields.weekLabel.value.trim() || "Week ?";
+    const date = fields.date.value || new Date().toISOString().slice(0, 10);
+    const id = editingId || `${slugify(weekLabel)}-${date.slice(0, 4)}`;
+
+    return {
+      id,
+      weekLabel,
+      title: fields.title.value.trim() || "Untitled post",
+      date,
+      cover: fields.cover.value.trim() || (items[0] ? items[0].image : ""),
+      excerpt: fields.excerpt.value.trim(),
+      items
+    };
+  }
+
+  function updatePreview() {
+    const post = buildPostFromForm();
+    const previewEl = document.getElementById("preview");
+    previewEl.innerHTML = `
+      <div class="post-hero" style="padding:28px;">
+        <div class="badge-row">
+          <span class="pill-tag">${escapeHtml(post.weekLabel)}</span>
+          <span class="pill-tag">${formatDate(post.date)}</span>
+        </div>
+        <h1 style="font-size:28px;">${escapeHtml(post.title)}</h1>
+        <p class="lede">${escapeHtml(post.excerpt)}</p>
+        ${post.cover ? `<div class="post-cover" style="aspect-ratio:16/9;"><img src="${escapeHtml(post.cover)}" alt=""></div>` : ""}
+      </div>
+      <div class="item-list" style="margin-top:20px;">
+        ${post.items.length ? post.items.map(itemCardHtml).join("") : `<p class="hint">Fill in at least one gadget's name to see it here.</p>`}
+      </div>
+    `;
+  }
+
+  function refreshPicker() {
+    const posts = loadAllPosts();
+    postPicker.innerHTML = `<option value="">— Load an existing post to edit —</option>` +
+      posts.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.weekLabel)} — ${escapeHtml(p.title)}${p.isDraft ? " (draft)" : ""}</option>`).join("");
+  }
+
+  postPicker.addEventListener("change", () => {
+    if (!postPicker.value) return;
+    const post = getPostById(postPicker.value);
+    if (post) loadPostIntoForm(post);
+  });
+
+  document.getElementById("newPostBtn").addEventListener("click", () => {
+    postPicker.value = "";
+    resetForm();
+  });
+
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2200);
+  }
+
+  document.getElementById("saveDraftBtn").addEventListener("click", () => {
+    const post = buildPostFromForm();
+    if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    editingId = post.id;
+    saveDraft(post);
+    refreshPicker();
+    postPicker.value = post.id;
+    showToast("Saved. Preview it now on the homepage in this browser.");
+  });
+
+  document.getElementById("deleteDraftBtn").addEventListener("click", () => {
+    if (!editingId) { showToast("Nothing to delete"); return; }
+    deleteDraft(editingId);
+    refreshPicker();
+    resetForm();
+    showToast("Draft deleted");
+  });
+
+  document.getElementById("generateBtn").addEventListener("click", () => {
+    const post = buildPostFromForm();
+    if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    delete post.isDraft;
+    const code = JSON.stringify(post, null, 2) + ",";
+    document.getElementById("codeOutput").value = code;
+    document.getElementById("codeBox").style.display = "block";
+    document.getElementById("codeBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  document.getElementById("copyCodeBtn").addEventListener("click", async () => {
+    const text = document.getElementById("codeOutput").value;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied — paste it into posts.js");
+    } catch (e) {
+      document.getElementById("codeOutput").select();
+      showToast("Press Ctrl/Cmd+C to copy");
+    }
+  });
+
+  refreshPicker();
+  resetForm();
+</script>
+</body>
+</html>

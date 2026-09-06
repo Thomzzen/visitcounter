@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gadget Weekly — Top 10 Fun &amp; Handy Gadgets</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> gadgetweekly.</div>
+    <div class="nav-links">
+      <a href="index.html" class="active">Home</a>
+      <a href="index.html#archive">Archive</a>
+      <a href="admin.html">Write a post</a>
+    </div>
+    <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
+  </nav>
+
+  <section class="hero" id="hero"></section>
+
+  <div class="section-label">
+    <span>Latest drops</span>
+    <div class="line"></div>
+    <button class="icon-btn" onclick="document.getElementById('archive').scrollIntoView({behavior:'smooth'})" title="See all posts">&darr;</button>
+  </div>
+
+  <div class="grid" id="archive"></div>
+
+  <footer>Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.</footer>
+</div>
+
+<script src="posts.js"></script>
+<script src="app.js"></script>
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+
+  const posts = loadAllPosts();
+  const heroEl = document.getElementById("hero");
+  const gridEl = document.getElementById("archive");
+
+  if (posts.length === 0) {
+    heroEl.outerHTML = `<div class="empty-state">No posts yet. Head to <a href="admin.html"><strong>Write a post</strong></a> to publish your first Top 10.</div>`;
+  } else {
+    const latest = posts[0];
+    const top = latest.items[0];
+    heroEl.innerHTML = `
+      <div class="hero-copy">
+        <div class="hero-eyebrow">${latest.weekLabel} &middot; ${formatDate(latest.date)}</div>
+        <h1>top 10<br>gadgets.</h1>
+        <p class="lede">${escapeHtml(latest.excerpt)}</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="post.html?id=${encodeURIComponent(latest.id)}">Read this week's list &rarr;</a>
+          <a class="btn btn-outline" href="#archive">Browse archive</a>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <span class="rank-badge">#1 pick this week</span>
+        ${top ? `<img src="${escapeHtml(top.image)}" alt="${escapeHtml(top.name)}">
+        <div class="price-tag">
+          <span class="name">${escapeHtml(top.name)}</span>
+          <span class="price">${escapeHtml(top.price || "")}</span>
+        </div>` : ""}
+      </div>
+    `;
+    gridEl.innerHTML = posts.map(postCardHtml).join("");
+  }
+</script>
+</body>
+</html>
