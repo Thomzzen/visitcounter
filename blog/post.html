@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gadget Weekly</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span> gadgetweekly.</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#archive">Archive</a>
+      <a href="admin.html">Write a post</a>
+    </div>
+    <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
+  </nav>
+
+  <div id="content"></div>
+
+  <footer>Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.</footer>
+</div>
+
+<script src="posts.js"></script>
+<script src="app.js"></script>
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const post = id ? getPostById(id) : null;
+  const contentEl = document.getElementById("content");
+
+  if (!post) {
+    contentEl.innerHTML = `<div class="empty-state">Couldn't find that post. <br><br><a class="btn btn-primary" href="index.html">Back to home</a></div>`;
+  } else {
+    const all = loadAllPosts();
+    const idx = all.findIndex(p => p.id === post.id);
+    const prev = all[idx + 1]; // older
+    const next = all[idx - 1]; // newer
+
+    contentEl.innerHTML = `
+      <div class="post-hero">
+        <div class="badge-row">
+          <span class="pill-tag">${escapeHtml(post.weekLabel)}</span>
+          <span class="pill-tag">${formatDate(post.date)}</span>
+          ${post.isDraft ? '<span class="pill-tag">Draft &middot; only visible in this browser</span>' : ""}
+        </div>
+        <h1>${escapeHtml(post.title)}</h1>
+        <p class="lede">${escapeHtml(post.excerpt)}</p>
+        ${post.cover ? `<div class="post-cover"><img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.title)}"></div>` : ""}
+      </div>
+
+      <div class="item-list">
+        ${post.items.map(itemCardHtml).join("")}
+      </div>
+
+      <div class="archive-nav">
+        ${prev ? `<a class="btn btn-outline" href="post.html?id=${encodeURIComponent(prev.id)}">&larr; ${escapeHtml(prev.weekLabel)}</a>` : `<span></span>`}
+        ${next ? `<a class="btn btn-outline" href="post.html?id=${encodeURIComponent(next.id)}">${escapeHtml(next.weekLabel)} &rarr;</a>` : `<span></span>`}
+      </div>
+    `;
+    document.title = post.title + " — Gadget Weekly";
+  }
+</script>
+</body>
+</html>
