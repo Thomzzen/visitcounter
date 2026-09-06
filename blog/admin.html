@@ -20,7 +20,7 @@
   <div class="lock-box">
     <h2>Owner only</h2>
     <p>Enter the passcode to write a post.</p>
-    <input type="password" id="lockInput" placeholder="Passcode" autocomplete="off">
+    <input type="password" id="lockInput" placeholder="Passcode" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn btn-primary" id="lockBtn">Unlock</button>
     <div class="error" id="lockError"></div>
   </div>
@@ -32,7 +32,7 @@
 
   function tryUnlock() {
     const input = document.getElementById("lockInput");
-    if (input.value === PASSCODE) {
+    if (input.value.trim().toLowerCase() === PASSCODE.toLowerCase()) {
       sessionStorage.setItem("gwUnlocked", "1");
       lockScreen.hidden = true;
     } else {
