@@ -548,6 +548,8 @@ footer a { text-decoration: underline; }
   z-index: 100;
 }
 
+.lock-screen[hidden] { display: none; }
+
 .lock-box {
   background: var(--card);
   border-radius: var(--r-lg);
