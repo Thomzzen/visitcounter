@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gadget Weekly — Top 10 Fun &amp; Handy Gadgets</title>
+<title>Gadget Weekly — Top 10 Fun &amp; Handy Gadgets, Every Week</title>
+<meta name="description" content="A new Top 10 list of fun and handy gadgets every week — fast charging gear, clever home gadgets, and small things that are actually worth buying.">
+<link rel="canonical" href="https://thomzzen.github.io/visitcounter/blog/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Gadget Weekly — Top 10 Fun & Handy Gadgets, Every Week">
+<meta property="og:description" content="A new Top 10 list of fun and handy gadgets every week — fast charging gear, clever home gadgets, and small things that are actually worth buying.">
+<meta property="og:url" content="https://thomzzen.github.io/visitcounter/blog/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Gadget Weekly — Top 10 Fun & Handy Gadgets, Every Week">
+<meta name="twitter:description" content="A new Top 10 list of fun and handy gadgets every week.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +24,6 @@
     <div class="nav-links">
       <a href="index.html" class="active">Home</a>
       <a href="index.html#archive">Archive</a>
-      <a href="admin.html">Write a post</a>
     </div>
     <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
   </nav>
@@ -30,7 +38,10 @@
 
   <div class="grid" id="archive"></div>
 
-  <footer>Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.</footer>
+  <footer>
+    Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.
+    &middot; <a href="disclosure.html">Affiliate disclosure</a>
+  </footer>
 </div>
 
 <script src="posts.js"></script>
@@ -53,7 +64,7 @@
         <h1>top 10<br>gadgets.</h1>
         <p class="lede">${escapeHtml(latest.excerpt)}</p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="post.html?id=${encodeURIComponent(latest.id)}">Read this week's list &rarr;</a>
+          <a class="btn btn-primary" href="${postHref(latest)}">Read this week's list &rarr;</a>
           <a class="btn btn-outline" href="#archive">Browse archive</a>
         </div>
       </div>

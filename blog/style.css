@@ -524,6 +524,54 @@ footer {
   font-size: 13px;
 }
 
+footer a { text-decoration: underline; }
+
+.disclosure {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.disclosure a { text-decoration: underline; color: var(--ink); }
+
+/* ---------- Admin lock screen ---------- */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.lock-box {
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: 40px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.lock-box h2 { font-family: 'Sora', sans-serif; margin: 0 0 6px; }
+.lock-box p { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+.lock-box input {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.lock-box .btn { width: 100%; justify-content: center; }
+.lock-box .error { color: #c0392b; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
 .empty-state {
   background: var(--card);
   border-radius: var(--r-lg);

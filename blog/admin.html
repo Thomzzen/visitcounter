@@ -3,10 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Write a Post — Gadget Weekly</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!--
+  Light passcode gate. This is NOT real security — anyone who views the
+  page source can see the check below. It only exists to keep casual
+  visitors from stumbling into the posting tool; it is not what stops
+  them from actually publishing anything (nothing here can touch the
+  live site — see README.md). Change PASSCODE to whatever you like.
+-->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-box">
+    <h2>Owner only</h2>
+    <p>Enter the passcode to write a post.</p>
+    <input type="password" id="lockInput" placeholder="Passcode" autocomplete="off">
+    <button class="btn btn-primary" id="lockBtn">Unlock</button>
+    <div class="error" id="lockError"></div>
+  </div>
+</div>
+<script>
+  const PASSCODE = "changeme"; // <-- change this to your own passcode
+  const lockScreen = document.getElementById("lockScreen");
+  if (sessionStorage.getItem("gwUnlocked") === "1") lockScreen.hidden = true;
+
+  function tryUnlock() {
+    const input = document.getElementById("lockInput");
+    if (input.value === PASSCODE) {
+      sessionStorage.setItem("gwUnlocked", "1");
+      lockScreen.hidden = true;
+    } else {
+      document.getElementById("lockError").textContent = "Wrong passcode";
+    }
+  }
+  document.getElementById("lockBtn").addEventListener("click", tryUnlock);
+  document.getElementById("lockInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") tryUnlock();
+  });
+</script>
 
 <div class="wrap">
 
@@ -15,7 +52,6 @@
     <div class="nav-links">
       <a href="index.html">Home</a>
       <a href="index.html#archive">Archive</a>
-      <a href="admin.html" class="active">Write a post</a>
     </div>
     <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
   </nav>
@@ -59,6 +95,10 @@
       </div>
 
       <h2 style="margin-top:28px;">3. The 10 gadgets</h2>
+      <p class="hint" style="margin-top:-12px; margin-bottom:16px;">
+        Paste your real affiliate links in "Affiliate / buy link" (Amazon Associates, Awin, Coolblue, etc.).
+        Every generated page already discloses affiliate use and marks these links <code>rel="sponsored"</code> for you.
+      </p>
       <div id="items"></div>
       <button class="btn btn-outline" id="addItemBtn">+ Add a gadget</button>
 
@@ -133,7 +173,7 @@
       <div class="field"><label>Why it's worth it</label><textarea class="i-blurb" rows="2">${escapeHtml(item.blurb)}</textarea></div>
       <div class="two-col">
         <div class="field"><label>Tag (optional)</label><input type="text" class="i-tag" value="${escapeHtml(item.tag)}" placeholder="Editor's Pick"></div>
-        <div class="field"><label>Buy link</label><input type="text" class="i-link" value="${escapeHtml(item.link)}" placeholder="https://..."></div>
+        <div class="field"><label>Affiliate / buy link</label><input type="text" class="i-link" value="${escapeHtml(item.link)}" placeholder="https://..."></div>
       </div>
     `;
     row.querySelector(".remove-item").addEventListener("click", () => {

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Gadget Weekly</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -15,14 +16,16 @@
     <div class="nav-links">
       <a href="index.html">Home</a>
       <a href="index.html#archive">Archive</a>
-      <a href="admin.html">Write a post</a>
     </div>
     <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
   </nav>
 
   <div id="content"></div>
 
-  <footer>Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.</footer>
+  <footer>
+    Handpicked every week. Nothing sponsored unless we say so. &copy; <span id="year"></span> gadgetweekly.
+    &middot; <a href="disclosure.html">Affiliate disclosure</a>
+  </footer>
 </div>
 
 <script src="posts.js"></script>
@@ -37,6 +40,9 @@
 
   if (!post) {
     contentEl.innerHTML = `<div class="empty-state">Couldn't find that post. <br><br><a class="btn btn-primary" href="index.html">Back to home</a></div>`;
+  } else if (!post.isDraft) {
+    // Published posts have a real, SEO-friendly page — send visitors there instead.
+    location.replace(postHref(post));
   } else {
     const all = loadAllPosts();
     const idx = all.findIndex(p => p.id === post.id);
@@ -48,11 +54,12 @@
         <div class="badge-row">
           <span class="pill-tag">${escapeHtml(post.weekLabel)}</span>
           <span class="pill-tag">${formatDate(post.date)}</span>
-          ${post.isDraft ? '<span class="pill-tag">Draft &middot; only visible in this browser</span>' : ""}
+          <span class="pill-tag">Draft &middot; only visible in this browser</span>
         </div>
         <h1>${escapeHtml(post.title)}</h1>
         <p class="lede">${escapeHtml(post.excerpt)}</p>
         ${post.cover ? `<div class="post-cover"><img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.title)}"></div>` : ""}
+        ${disclosureHtml("")}
       </div>
 
       <div class="item-list">
