@@ -16,23 +16,31 @@ A tiny, no-backend blog for posting a "Top 10 fun & handy gadgets" list every we
 Everything is static HTML/CSS/JS — no server, no database. `build.js` needs
 Node.js, but only in CI (see below); browsing the site needs nothing.
 
-## Writing a new weekly post
+## Writing a new weekly post (one click)
 
 1. Open `admin.html` and enter your passcode (see "Keeping it to just you" below).
-2. Fill in the week label, title, date, cover image and the 10 gadgets
+2. The first time only: open the "GitHub connection" panel at the top and follow
+   "First time here? How to get a token" to connect it to this repo. The token is
+   saved in your browser, so you only do this once per device.
+3. Fill in the week label, title, date, cover image and the 10 gadgets
    (name, image URL, a sentence on why it's worth it, price, optional tag,
-   affiliate/buy link).
-3. Click **Save draft (this browser)** to preview it instantly on `index.html`
-   — this only saves to your own browser's local storage, so it's safe to
-   experiment and nobody else can see it.
-4. When it looks right, click **Generate code to publish**, then **Copy code**.
-5. Open `posts.js`, paste the copied object at the top of the `POSTS` array
-   (keep the trailing comma), save, commit and push.
-6. GitHub Actions takes it from there: it runs `build.js`, which turns your
-   new post into a real static page at `blog/posts/<id>.html`, adds it to
-   `sitemap.xml`, and deploys — usually live within a minute or two.
-7. Optional: come back to `admin.html`, pick the draft from the dropdown and
-   click **Delete this draft** now that it's published for real.
+   affiliate/buy link). The live preview on the right updates as you type.
+4. Click **Publish to website**. It commits the change straight to `posts.js`
+   for you — no copy-pasting, no editing files by hand. GitHub Actions then
+   builds a real static page for it and deploys, usually live within a
+   minute or two.
+5. To fix or update a post later: pick it from the "Pick a post" dropdown at
+   the top, change what you need, and click **Publish to website** again —
+   it updates that same post in place instead of creating a new one.
+
+Two extra tools if you want them:
+- **Save draft (preview only)** saves to your browser's local storage so you
+  can preview a post on `index.html` before publishing it for real — nothing
+  is public until you click "Publish to website".
+- **Advanced: copy the code manually** (collapsed section) is the original,
+  no-token fallback: it gives you the post as code to paste into `posts.js`
+  yourself, in case you'd rather not set up a GitHub token, or the one-click
+  publish ever fails.
 
 You can also skip `admin.html` entirely and just duplicate one of the objects
 in `posts.js` by hand — the comments at the top of that file explain the
@@ -42,17 +50,20 @@ format.
 
 Two separate layers:
 
-- **The only way anything becomes visible to visitors is a `git push` to this
-  repo.** `admin.html` never talks to a server — "Save draft" writes to your
-  own browser's local storage, and "Generate code" just hands you text you'd
-  still have to paste and push yourself. So even if a stranger found
-  `admin.html`, they could not publish anything.
-- Even so, `admin.html` is passcode-gated (`PASSCODE` near the top of the
-  file, default `"changeme"` — **change it**) so casual visitors don't
-  stumble into the tool, and it's excluded from search engines
-  (`noindex`) and from `robots.txt`. This is a light deterrent, not real
-  security — anyone who views the page source can read the passcode. Don't
-  reuse a password you care about there.
+- **The only way anything becomes visible to visitors is a commit landing on
+  `main`.** Only someone holding a GitHub token scoped to this repo (set up
+  once in the "GitHub connection" panel) can make `admin.html` actually
+  publish. Without that token, "Save draft" only writes to your own
+  browser's local storage, and "Generate code" just hands you text you'd
+  still have to paste and push yourself — a stranger who found `admin.html`
+  without your token could not publish anything.
+- `admin.html` is also passcode-gated (`PASSCODE` near the top of the
+  file — **change it from the default**) so casual visitors don't stumble
+  into the tool, and it's excluded from search engines (`noindex`) and from
+  `robots.txt`. This is a light deterrent, not real security — anyone who
+  views the page source can read the passcode. Don't reuse a password you
+  care about there. Your GitHub token is the real access control; treat it
+  like a password and use "Disconnect" on a shared computer.
 
 ## SEO — how people find it
 
