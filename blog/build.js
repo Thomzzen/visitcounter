@@ -101,7 +101,6 @@ ${jsonLd}
       <a href="../index.html">Home</a>
       <a href="../index.html#archive">Archive</a>
     </div>
-    <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
   </nav>
 
   <div class="post-hero">
