@@ -60,6 +60,21 @@
     <div class="line"></div>
   </div>
 
+  <div class="panel" id="labelsPanel" style="margin-bottom:24px;">
+    <h2>Filter labels</h2>
+    <p class="hint" style="margin-top:0;">
+      These are the labels visitors can filter the homepage by, and what fills the "Tag" dropdown
+      for each gadget below. Add or remove one here — it publishes straight away (needs GitHub
+      connected below).
+    </p>
+    <div class="filter-bar" id="labelPills"></div>
+    <div class="select-line">
+      <input type="text" id="newLabelInput" placeholder="New label, e.g. Splurge">
+      <button class="btn btn-primary" id="addLabelBtn">+ Add label</button>
+    </div>
+    <p class="hint" id="labelsHint"></p>
+  </div>
+
   <div class="panel" id="githubPanel" style="margin-bottom:24px;">
     <h2>GitHub connection</h2>
     <p class="hint" id="ghStatus" style="margin-top:0;"></p>
@@ -171,11 +186,13 @@
 <div class="toast" id="toast"></div>
 
 <script src="posts.js"></script>
+<script src="labels.js"></script>
 <script src="app.js"></script>
 <script>
   const itemsEl = document.getElementById("items");
   const postPicker = document.getElementById("postPicker");
   let editingId = null;
+  let labels = (typeof LABELS !== "undefined") ? LABELS.slice() : [];
 
   const fields = {
     weekLabel: document.getElementById("f-weekLabel"),
@@ -193,6 +210,13 @@
     return { name: "", image: "", blurb: "", price: "", tag: "", link: "" };
   }
 
+  function tagOptionsHtml(selected) {
+    const list = labels.slice();
+    if (selected && !list.includes(selected)) list.push(selected);
+    return `<option value="">No tag</option>` +
+      list.map(l => `<option value="${escapeHtml(l)}"${l === selected ? " selected" : ""}>${escapeHtml(l)}</option>`).join("");
+  }
+
   function renderItemRow(item, index) {
     const row = document.createElement("div");
     row.className = "item-row";
@@ -206,7 +230,7 @@
       <div class="field"><label>Image URL</label><input type="text" class="i-image" value="${escapeHtml(item.image)}" placeholder="https://..."></div>
       <div class="field"><label>Why it's worth it</label><textarea class="i-blurb" rows="2">${escapeHtml(item.blurb)}</textarea></div>
       <div class="two-col">
-        <div class="field"><label>Tag (optional)</label><input type="text" class="i-tag" value="${escapeHtml(item.tag)}" placeholder="Editor's Pick"></div>
+        <div class="field"><label>Tag (optional)</label><select class="i-tag">${tagOptionsHtml(item.tag)}</select></div>
         <div class="field"><label>Affiliate / buy link</label><input type="text" class="i-link" value="${escapeHtml(item.link)}" placeholder="https://..."></div>
       </div>
     `;
@@ -215,7 +239,7 @@
       renumberRows();
       updatePreview();
     });
-    row.querySelectorAll("input, textarea").forEach(el => el.addEventListener("input", updatePreview));
+    row.querySelectorAll("input, textarea, select").forEach(el => el.addEventListener("input", updatePreview));
     return row;
   }
 
@@ -510,9 +534,99 @@
     }
   });
 
+  /* ---------- Manage filter labels ---------- */
+
+  async function fetchLabelsJsFile() {
+    const data = await githubRequest(`/contents/blog/labels.js?ref=${GITHUB_BRANCH}`);
+    return { sha: data.sha };
+  }
+
+  async function publishLabels() {
+    const { sha } = await fetchLabelsJsFile();
+    const content = `/*\n * LABELS is the managed list of filter labels shown as pills on the\n * homepage, and offered as the "Tag" dropdown for each gadget in\n * admin.html.\n *\n * Manage this from admin.html's "Filter labels" panel (add/remove there\n * publishes straight to this file), or edit the array by hand and push.\n */\nconst LABELS = ${JSON.stringify(labels, null, 2)};\n`;
+    await githubRequest(`/contents/blog/labels.js`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Update filter labels",
+        content: b64EncodeUnicode(content),
+        sha,
+        branch: GITHUB_BRANCH
+      })
+    });
+  }
+
+  function renderLabelPills() {
+    const el = document.getElementById("labelPills");
+    el.innerHTML = labels.map(l => `
+      <span class="filter-pill" style="display:inline-flex; align-items:center; gap:8px; cursor:default;">
+        ${escapeHtml(l)}
+        <button type="button" class="remove-label-btn" data-label="${escapeHtml(l)}" title="Remove" style="background:none; border:none; color:inherit; cursor:pointer; font-weight:800; font-size:14px; line-height:1; padding:0;">&times;</button>
+      </span>
+    `).join("") || `<p class="hint" style="margin:0;">No labels yet — add one below.</p>`;
+    el.querySelectorAll(".remove-label-btn").forEach(btn => {
+      btn.addEventListener("click", () => removeLabel(btn.dataset.label));
+    });
+    // keep every open Tag dropdown in sync with the current label list
+    itemsEl.querySelectorAll(".item-row").forEach(row => {
+      const select = row.querySelector(".i-tag");
+      const current = select.value;
+      select.innerHTML = tagOptionsHtml(current);
+    });
+  }
+
+  async function addLabel() {
+    const input = document.getElementById("newLabelInput");
+    const value = input.value.trim();
+    const hint = document.getElementById("labelsHint");
+    if (!value) { showToast("Type a label first"); return; }
+    if (labels.includes(value)) { showToast("That label already exists"); return; }
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
+    const prev = labels.slice();
+    labels.push(value);
+    renderLabelPills();
+    input.value = "";
+    hint.textContent = "Publishing…";
+    try {
+      await publishLabels();
+      hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
+      showToast("Label added");
+    } catch (err) {
+      labels = prev;
+      renderLabelPills();
+      hint.textContent = "Failed: " + err.message;
+      showToast("Failed to add label: " + err.message);
+    }
+  }
+
+  async function removeLabel(label) {
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
+    const hint = document.getElementById("labelsHint");
+    const prev = labels.slice();
+    labels = labels.filter(l => l !== label);
+    renderLabelPills();
+    hint.textContent = "Publishing…";
+    try {
+      await publishLabels();
+      hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
+      showToast("Label removed");
+    } catch (err) {
+      labels = prev;
+      renderLabelPills();
+      hint.textContent = "Failed: " + err.message;
+      showToast("Failed to remove label: " + err.message);
+    }
+  }
+
+  document.getElementById("addLabelBtn").addEventListener("click", addLabel);
+  document.getElementById("newLabelInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") addLabel();
+  });
+
   refreshGhStatus();
   refreshPicker();
   resetForm();
+  renderLabelPills();
 </script>
 </body>
 </html>
