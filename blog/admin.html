@@ -4,51 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.workers.dev; base-uri 'none'; form-action 'none'; object-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none';">
 <title>Write a Post — Gadget Weekly</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!--
-  Real access control lives in the Cloudflare Worker (see
-  ../cloudflare-worker/worker.js), not in this file. The password is
-  checked server-side on every request and the GitHub token never
-  reaches this page at all -- so there is nothing secret in this file's
-  source for anyone to find. See blog/README.md, "Real security: the
-  Cloudflare Worker proxy" for setup and for how to rotate the password.
+  Passcode gate, checked against a SHA-256 hash (not the plaintext) so
+  reading this page's source doesn't hand someone the passcode outright.
+  It still only deters casual visitors, not a determined attacker who
+  copies the hash and cracks it offline -- so pick a real passphrase
+  (a few random words), not a short dictionary word. It is also still
+  not what stops anyone from publishing: only someone holding a GitHub
+  token scoped to this repo (set up below) can actually do that.
+
+  To change the passcode: unlock the page, open "Security" near the
+  bottom of the left column, type a new passcode there, and paste the
+  hash it gives you over PASSCODE_HASH below.
 -->
 <div class="lock-screen" id="lockScreen">
   <div class="lock-box">
     <h2>Owner only</h2>
-    <p>Enter the password to write a post.</p>
-    <input type="password" id="lockInput" placeholder="Password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <p>Enter the passcode to write a post.</p>
+    <input type="password" id="lockInput" placeholder="Passcode" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn btn-primary" id="lockBtn">Unlock</button>
     <div class="error" id="lockError"></div>
   </div>
 </div>
 <script>
-  // Set this after deploying the Worker (see blog/README.md).
-  const WORKER_URL = "https://REPLACE-ME.workers.dev";
-
+  // SHA-256 of the real passcode -- see the comment above for how to change it.
+  const PASSCODE_HASH = "e0c12407faa1b6e314e938912db6e3632517f14d770eae35a39621e460079489";
   const MAX_ATTEMPTS = 5;
   const LOCKOUT_MS = 30000;
   const lockScreen = document.getElementById("lockScreen");
-  let sessionPassword = null; // held in memory only -- never written to storage
+  if (sessionStorage.getItem("gwUnlocked") === "1") lockScreen.hidden = true;
 
-  async function callWorkerWithPassword(action, password, payload) {
-    const res = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, action, ...payload })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-    return data;
-  }
-
-  function callWorker(action, payload) {
-    return callWorkerWithPassword(action, sessionPassword, payload);
+  async function sha256Hex(str) {
+    const bytes = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
   function lockedUntil() {
@@ -70,38 +65,22 @@
 
   async function tryUnlock() {
     if (lockedUntil() > Date.now()) return;
-    if (WORKER_URL.includes("REPLACE-ME")) {
-      document.getElementById("lockError").textContent = "Admin proxy isn't configured yet — see blog/README.md.";
-      return;
-    }
     const input = document.getElementById("lockInput");
-    const typed = input.value;
-    const btn = document.getElementById("lockBtn");
-    btn.disabled = true;
-    btn.textContent = "Checking…";
-    try {
-      await callWorkerWithPassword("checkPassword", typed, {});
-      sessionPassword = typed;
+    const hash = await sha256Hex(input.value.trim().toLowerCase());
+    if (hash === PASSCODE_HASH) {
+      sessionStorage.setItem("gwUnlocked", "1");
       sessionStorage.removeItem("gwAttempts");
       lockScreen.hidden = true;
-    } catch (err) {
-      const isAuthError = /wrong password/i.test(err.message);
-      if (!isAuthError) {
-        document.getElementById("lockError").textContent = "Couldn't reach the admin server: " + err.message;
+    } else {
+      const attempts = Number(sessionStorage.getItem("gwAttempts") || 0) + 1;
+      sessionStorage.setItem("gwAttempts", String(attempts));
+      if (attempts >= MAX_ATTEMPTS) {
+        sessionStorage.setItem("gwLockedUntil", String(Date.now() + LOCKOUT_MS));
+        sessionStorage.removeItem("gwAttempts");
+        updateLockUi();
       } else {
-        const attempts = Number(sessionStorage.getItem("gwAttempts") || 0) + 1;
-        sessionStorage.setItem("gwAttempts", String(attempts));
-        if (attempts >= MAX_ATTEMPTS) {
-          sessionStorage.setItem("gwLockedUntil", String(Date.now() + LOCKOUT_MS));
-          sessionStorage.removeItem("gwAttempts");
-          updateLockUi();
-        } else {
-          document.getElementById("lockError").textContent = `Wrong password (${MAX_ATTEMPTS - attempts} attempt(s) left)`;
-        }
+        document.getElementById("lockError").textContent = `Wrong passcode (${MAX_ATTEMPTS - attempts} attempt(s) left)`;
       }
-    } finally {
-      btn.textContent = "Unlock";
-      btn.disabled = lockedUntil() > Date.now();
     }
   }
   document.getElementById("lockBtn").addEventListener("click", tryUnlock);
@@ -130,7 +109,8 @@
     <h2>Filter labels</h2>
     <p class="hint" style="margin-top:0;">
       These are the labels visitors can filter the homepage by, and what fills the "Tag" dropdown
-      for each gadget below. Add or remove one here — it publishes straight away.
+      for each gadget below. Add or remove one here — it publishes straight away (needs GitHub
+      connected below).
     </p>
     <div class="filter-bar" id="labelPills"></div>
     <div class="select-line">
@@ -138,6 +118,34 @@
       <button class="btn btn-primary" id="addLabelBtn">+ Add label</button>
     </div>
     <p class="hint" id="labelsHint"></p>
+  </div>
+
+  <div class="panel" id="githubPanel" style="margin-bottom:24px;">
+    <h2>GitHub connection</h2>
+    <p class="hint" id="ghStatus" style="margin-top:0;"></p>
+    <div class="field">
+      <label>GitHub token</label>
+      <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="actions-row">
+      <button class="btn btn-primary" id="ghSaveBtn">Save token</button>
+      <button class="btn btn-outline" id="ghClearBtn">Disconnect</button>
+    </div>
+    <details style="margin-top:16px;">
+      <summary style="cursor:pointer; font-size:13px; font-weight:700; color:var(--muted);">First time here? How to get a token</summary>
+      <ol class="hint" style="padding-left:18px; margin-top:10px;">
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> (log in if it asks)</li>
+        <li>Give it any name, e.g. "Gadget Weekly admin"</li>
+        <li>Under "Repository access" choose "Only select repositories" → pick <code>Thomzzen/visitcounter</code></li>
+        <li>Under "Permissions" → "Repository permissions", set <strong>Contents</strong> to <strong>Read and write</strong> (leave everything else as-is)</li>
+        <li>Click "Generate token" at the bottom, copy the token it shows you (starts with <code>github_pat_</code>)</li>
+        <li>Paste it into the field above and click "Save token"</li>
+      </ol>
+      <p class="hint">
+        The token is stored only in this browser (never sent anywhere except api.github.com) and only has access
+        to this one repository. Treat it like a password. Click "Disconnect" if you're on a shared computer.
+      </p>
+    </details>
   </div>
 
   <div class="admin-grid">
@@ -190,7 +198,7 @@
 
       <details style="margin-top:20px;">
         <summary style="cursor:pointer; font-size:13px; font-weight:700; color:var(--muted);">Advanced: copy the code manually instead</summary>
-        <p class="hint">Use this if the admin proxy is ever down, or you'd rather paste it in yourself.</p>
+        <p class="hint">Use this if you haven't connected GitHub above, or prefer to paste it in yourself.</p>
         <div class="actions-row">
           <button class="btn btn-outline" id="generateBtn">Generate code</button>
         </div>
@@ -212,17 +220,33 @@
       <details style="margin-top:12px;">
         <summary style="cursor:pointer; font-size:13px; font-weight:700; color:var(--muted);">Security</summary>
         <p class="hint">
-          Nothing secret lives in this page anymore — no password hash, no GitHub token. Both are stored only
-          as secrets on Cloudflare and checked on the server. To change either:
+          The passcode above is checked against a hash, not stored as plain text — but it's still only a
+          deterrent for casual visitors, not real security. The actual thing keeping this repo safe is that
+          nobody else has your GitHub token. Two things worth doing:
         </p>
         <ul class="hint" style="padding-left:18px;">
-          <li>Go to the Cloudflare dashboard → Workers &amp; Pages → your worker → Settings → Variables and Secrets.</li>
-          <li>Edit <code>ADMIN_PASSWORD</code> to rotate the password, or <code>GITHUB_TOKEN</code> to rotate the token.
-            Use a real passphrase (three or four random words) for the password.</li>
-          <li>Make sure the GitHub token is a <strong>fine-grained</strong> token scoped to only this repository with
-            only <strong>Contents: Read and write</strong>, and give it an expiration date.</li>
+          <li>Use a real passphrase here (three or four random words), not a short word — the hash can be
+            cracked offline by anyone who reads the page source, just not instantly.</li>
+          <li>Make sure your GitHub token (further down) is a <strong>fine-grained</strong> token scoped to
+            only this repository with only <strong>Contents: Read and write</strong>, and give it an
+            expiration date — so a leaked token is limited in both what it can touch and how long it works.</li>
         </ul>
-        <p class="hint">Full setup steps are in <code>blog/README.md</code>.</p>
+        <p class="hint" style="margin-top:14px; font-weight:700;">Change the passcode</p>
+        <div class="two-col">
+          <div class="field" style="grid-column: span 2;">
+            <input type="text" id="newPasscodeInput" placeholder="Type a new passcode" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          </div>
+        </div>
+        <button class="btn btn-outline" id="hashPasscodeBtn">Generate hash</button>
+        <div id="passcodeHashBox" style="display:none; margin-top:14px;">
+          <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:8px;">
+            Paste this over the PASSCODE_HASH line near the top of admin.html
+          </label>
+          <textarea class="code-output" id="passcodeHashOutput" readonly style="min-height:60px;"></textarea>
+          <div class="actions-row">
+            <button class="btn btn-outline" id="copyPasscodeHashBtn">Copy line</button>
+          </div>
+        </div>
       </details>
     </div>
 
@@ -448,11 +472,142 @@
     }
   });
 
-  /* ---------- Publish via the Cloudflare Worker ---------- */
+  document.getElementById("hashPasscodeBtn").addEventListener("click", async () => {
+    const value = document.getElementById("newPasscodeInput").value.trim();
+    if (!value) { showToast("Type a new passcode first"); return; }
+    const hash = await sha256Hex(value.toLowerCase());
+    document.getElementById("passcodeHashOutput").value = `const PASSCODE_HASH = "${hash}";`;
+    document.getElementById("passcodeHashBox").style.display = "block";
+  });
+
+  document.getElementById("copyPasscodeHashBtn").addEventListener("click", async () => {
+    const text = document.getElementById("passcodeHashOutput").value;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied — paste it over PASSCODE_HASH near the top of admin.html");
+    } catch (e) {
+      document.getElementById("passcodeHashOutput").select();
+      showToast("Press Ctrl/Cmd+C to copy");
+    }
+  });
+
+  /* ---------- Publish straight to GitHub ---------- */
+
+  const GITHUB_OWNER = "Thomzzen";
+  const GITHUB_REPO = "visitcounter";
+  const GITHUB_BRANCH = "main";
+  const TOKEN_KEY = "gwGithubToken";
+
+  const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
+  const setToken = t => localStorage.setItem(TOKEN_KEY, t);
+  const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+  function b64EncodeUnicode(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode("0x" + p1)));
+  }
+  function b64DecodeUnicode(str) {
+    return decodeURIComponent(atob(str).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+  }
+
+  async function githubRequest(path, options) {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}${path}`, {
+      ...options,
+      headers: {
+        "Authorization": `Bearer ${getToken()}`,
+        "Accept": "application/vnd.github+json",
+        ...(options && options.headers)
+      }
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `GitHub API error (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async function fetchPostsJsFile() {
+    const data = await githubRequest(`/contents/blog/posts.js?ref=${GITHUB_BRANCH}`);
+    return { text: b64DecodeUnicode(data.content), sha: data.sha };
+  }
+
+  function insertNewPost(fileText, post) {
+    const marker = "const POSTS = [";
+    const idx = fileText.indexOf(marker);
+    if (idx === -1) throw new Error('Could not find "const POSTS = [" in posts.js');
+    const insertAt = idx + marker.length;
+    const objText = "\n  " + JSON.stringify(post, null, 2).replace(/\n/g, "\n  ") + ",";
+    return fileText.slice(0, insertAt) + objText + fileText.slice(insertAt);
+  }
+
+  function replaceExistingPost(fileText, post) {
+    const marker = `id: "${post.id}"`;
+    const markerIdx = fileText.indexOf(marker);
+    if (markerIdx === -1) throw new Error("Could not find that post in posts.js to update");
+    const start = fileText.lastIndexOf("{", markerIdx);
+    if (start === -1) throw new Error("Could not locate the start of the post block");
+    let depth = 0, end = -1;
+    for (let i = start; i < fileText.length; i++) {
+      if (fileText[i] === "{") depth++;
+      else if (fileText[i] === "}") {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    if (end === -1) throw new Error("Could not locate the end of the post block");
+    const objText = JSON.stringify(post, null, 2).replace(/\n/g, "\n  ");
+    return fileText.slice(0, start) + objText + fileText.slice(end + 1);
+  }
+
+  async function publishToGithub(post, isEdit) {
+    const { text, sha } = await fetchPostsJsFile();
+    const updated = isEdit ? replaceExistingPost(text, post) : insertNewPost(text, post);
+    await githubRequest(`/contents/blog/posts.js`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: isEdit ? `Update post: ${post.title}` : `Add post: ${post.title}`,
+        content: b64EncodeUnicode(updated),
+        sha,
+        branch: GITHUB_BRANCH
+      })
+    });
+  }
+
+  function refreshGhStatus() {
+    const el = document.getElementById("ghStatus");
+    const publishBtn = document.getElementById("publishBtn");
+    if (getToken()) {
+      el.textContent = "Connected — \"Publish to website\" below will commit and go live in about a minute.";
+      publishBtn.textContent = "Publish to website";
+    } else {
+      el.textContent = "Not connected yet. Add a token below to publish with one click, or use \"Advanced\" to copy the code manually.";
+      publishBtn.textContent = "Publish to website (connect GitHub first)";
+    }
+  }
+
+  document.getElementById("ghSaveBtn").addEventListener("click", () => {
+    const val = document.getElementById("ghToken").value.trim();
+    if (!val) { showToast("Paste a token first"); return; }
+    setToken(val);
+    document.getElementById("ghToken").value = "";
+    refreshGhStatus();
+    showToast("GitHub connected");
+  });
+
+  document.getElementById("ghClearBtn").addEventListener("click", () => {
+    clearToken();
+    refreshGhStatus();
+    showToast("Disconnected");
+  });
 
   document.getElementById("publishBtn").addEventListener("click", async () => {
     const post = buildPostFromForm();
     if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    if (!getToken()) {
+      showToast("Connect GitHub first — see the panel above");
+      document.getElementById("githubPanel").scrollIntoView({ behavior: "smooth" });
+      return;
+    }
     delete post.isDraft;
     const isEdit = typeof POSTS !== "undefined" && POSTS.some(p => p.id === post.id);
     const btn = document.getElementById("publishBtn");
@@ -461,7 +616,7 @@
     btn.textContent = "Publishing…";
     hint.textContent = "";
     try {
-      await callWorker("publishPost", { post, isEdit });
+      await publishToGithub(post, isEdit);
       deleteDraft(post.id);
       refreshPicker();
       showToast(isEdit ? "Updated! Live in about a minute." : "Published! Live in about a minute.");
@@ -471,11 +626,31 @@
       hint.textContent = "Publish failed: " + err.message;
     } finally {
       btn.disabled = false;
-      btn.textContent = "Publish to website";
+      refreshGhStatus();
     }
   });
 
   /* ---------- Manage filter labels ---------- */
+
+  async function fetchLabelsJsFile() {
+    const data = await githubRequest(`/contents/blog/labels.js?ref=${GITHUB_BRANCH}`);
+    return { sha: data.sha };
+  }
+
+  async function publishLabels() {
+    const { sha } = await fetchLabelsJsFile();
+    const content = `/*\n * LABELS is the managed list of filter labels shown as pills on the\n * homepage, and offered as the "Tag" dropdown for each gadget in\n * admin.html.\n *\n * Manage this from admin.html's "Filter labels" panel (add/remove there\n * publishes straight to this file), or edit the array by hand and push.\n */\nconst LABELS = ${JSON.stringify(labels, null, 2)};\n`;
+    await githubRequest(`/contents/blog/labels.js`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Update filter labels",
+        content: b64EncodeUnicode(content),
+        sha,
+        branch: GITHUB_BRANCH
+      })
+    });
+  }
 
   function renderLabelPills() {
     const el = document.getElementById("labelPills");
@@ -502,13 +677,14 @@
     const hint = document.getElementById("labelsHint");
     if (!value) { showToast("Type a label first"); return; }
     if (labels.includes(value)) { showToast("That label already exists"); return; }
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
     const prev = labels.slice();
     labels.push(value);
     renderLabelPills();
     input.value = "";
     hint.textContent = "Publishing…";
     try {
-      await callWorker("publishLabels", { labels });
+      await publishLabels();
       hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
       showToast("Label added");
     } catch (err) {
@@ -520,13 +696,14 @@
   }
 
   async function removeLabel(label) {
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
     const hint = document.getElementById("labelsHint");
     const prev = labels.slice();
     labels = labels.filter(l => l !== label);
     renderLabelPills();
     hint.textContent = "Publishing…";
     try {
-      await callWorker("publishLabels", { labels });
+      await publishLabels();
       hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
       showToast("Label removed");
     } catch (err) {
@@ -542,6 +719,7 @@
     if (e.key === "Enter") addLabel();
   });
 
+  refreshGhStatus();
   refreshPicker();
   resetForm();
   renderLabelPills();
