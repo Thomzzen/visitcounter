@@ -7,7 +7,6 @@
  * publishes straight to this file), or edit the array by hand and push.
  */
 const LABELS = [
-  "Trending",
   "Budget Pick",
   "Splurge"
 ];
