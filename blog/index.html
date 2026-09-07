@@ -25,7 +25,6 @@
       <a href="index.html" class="active">Home</a>
       <a href="index.html#archive">Archive</a>
     </div>
-    <button class="icon-btn" title="Fun & handy gadgets, every week">&#9733;</button>
   </nav>
 
   <section class="hero" id="hero"></section>
@@ -35,6 +34,8 @@
     <div class="line"></div>
     <button class="icon-btn" onclick="document.getElementById('archive').scrollIntoView({behavior:'smooth'})" title="See all posts">&darr;</button>
   </div>
+
+  <div class="filter-bar" id="filterBar"></div>
 
   <div class="grid" id="archive"></div>
 
@@ -51,13 +52,45 @@
 
   const posts = loadAllPosts();
   const heroEl = document.getElementById("hero");
+  const filterBarEl = document.getElementById("filterBar");
   const gridEl = document.getElementById("archive");
+  let activeTag = null;
+
+  function uniqueTags(list) {
+    const tags = [];
+    list.forEach(p => p.items.forEach(i => {
+      if (i.tag && !tags.includes(i.tag)) tags.push(i.tag);
+    }));
+    return tags;
+  }
+
+  function renderFilterBar() {
+    const tags = uniqueTags(posts);
+    if (!tags.length) { filterBarEl.innerHTML = ""; return; }
+    filterBarEl.innerHTML = `
+      <button class="filter-pill${activeTag === null ? " active" : ""}" data-tag="">All</button>
+      ${tags.map(t => `<button class="filter-pill${activeTag === t ? " active" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+    `;
+    filterBarEl.querySelectorAll(".filter-pill").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activeTag = btn.dataset.tag || null;
+        renderFilterBar();
+        renderGrid();
+      });
+    });
+  }
+
+  function renderGrid() {
+    const filtered = activeTag ? posts.filter(p => p.items.some(i => i.tag === activeTag)) : posts;
+    gridEl.innerHTML = filtered.length
+      ? filtered.map(postCardHtml).join("")
+      : `<div class="empty-state">No posts tagged "${escapeHtml(activeTag)}" yet.</div>`;
+  }
 
   if (posts.length === 0) {
     heroEl.outerHTML = `<div class="empty-state">No posts yet. Head to <a href="admin.html"><strong>Write a post</strong></a> to publish your first Top 10.</div>`;
   } else {
     const latest = posts[0];
-    const top = latest.items[0];
     heroEl.innerHTML = `
       <div class="hero-copy">
         <div class="hero-eyebrow">${latest.weekLabel} &middot; ${formatDate(latest.date)}</div>
@@ -68,16 +101,17 @@
           <a class="btn btn-outline" href="#archive">Browse archive</a>
         </div>
       </div>
-      <div class="hero-visual">
-        <span class="rank-badge">#1 pick this week</span>
-        ${top ? `<img src="${escapeHtml(top.image)}" alt="${escapeHtml(top.name)}">
+      <a class="hero-visual" href="${postHref(latest)}">
+        <span class="rank-badge">Latest post</span>
+        <img src="${escapeHtml(latest.cover)}" alt="${escapeHtml(latest.title)}">
         <div class="price-tag">
-          <span class="name">${escapeHtml(top.name)}</span>
-          <span class="price">${escapeHtml(top.price || "")}</span>
-        </div>` : ""}
-      </div>
+          <span class="name">${escapeHtml(latest.title)}</span>
+          <span class="price">${escapeHtml(latest.weekLabel)}</span>
+        </div>
+      </a>
     `;
-    gridEl.innerHTML = posts.map(postCardHtml).join("");
+    renderFilterBar();
+    renderGrid();
   }
 </script>
 </body>
