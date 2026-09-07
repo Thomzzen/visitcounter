@@ -114,8 +114,6 @@ No hash to regenerate, no file to edit — just go back to the Worker's
   30 seconds client-side, which stops casual retries but not a determined
   script hitting the Worker directly.
 
-## Real security (SEO)
-
 ## SEO — how people find it
 
 - `build.js` generates one real, static HTML page per post at
