@@ -4,17 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.github.com; base-uri 'none'; form-action 'none'; object-src 'none';">
 <title>Write a Post — Gadget Weekly</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!--
-  Light passcode gate. This is NOT real security — anyone who views the
-  page source can see the check below. It only exists to keep casual
-  visitors from stumbling into the posting tool; it is not what stops
-  them from actually publishing anything (that needs the GitHub token
-  set up below, which only you have). Change PASSCODE to whatever you like.
+  Passcode gate, checked against a SHA-256 hash (not the plaintext) so
+  reading this page's source doesn't hand someone the passcode outright.
+  It still only deters casual visitors, not a determined attacker who
+  copies the hash and cracks it offline -- so pick a real passphrase
+  (a few random words), not a short dictionary word. It is also still
+  not what stops anyone from publishing: only someone holding a GitHub
+  token scoped to this repo (set up below) can actually do that.
+
+  To change the passcode: unlock the page, open "Security" near the
+  bottom of the left column, type a new passcode there, and paste the
+  hash it gives you over PASSCODE_HASH below.
 -->
 <div class="lock-screen" id="lockScreen">
   <div class="lock-box">
@@ -26,23 +33,61 @@
   </div>
 </div>
 <script>
-  const PASSCODE = "gadgets2026"; // <-- change this to your own passcode
+  // SHA-256 of the real passcode -- see the comment above for how to change it.
+  const PASSCODE_HASH = "e0c12407faa1b6e314e938912db6e3632517f14d770eae35a39621e460079489";
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_MS = 30000;
   const lockScreen = document.getElementById("lockScreen");
   if (sessionStorage.getItem("gwUnlocked") === "1") lockScreen.hidden = true;
 
-  function tryUnlock() {
+  async function sha256Hex(str) {
+    const bytes = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function lockedUntil() {
+    return Number(sessionStorage.getItem("gwLockedUntil") || 0);
+  }
+
+  function updateLockUi() {
+    const remaining = lockedUntil() - Date.now();
+    const btn = document.getElementById("lockBtn");
+    const err = document.getElementById("lockError");
+    if (remaining > 0) {
+      btn.disabled = true;
+      err.textContent = `Too many attempts. Try again in ${Math.ceil(remaining / 1000)}s.`;
+      setTimeout(updateLockUi, 1000);
+    } else {
+      btn.disabled = false;
+    }
+  }
+
+  async function tryUnlock() {
+    if (lockedUntil() > Date.now()) return;
     const input = document.getElementById("lockInput");
-    if (input.value.trim().toLowerCase() === PASSCODE.toLowerCase()) {
+    const hash = await sha256Hex(input.value.trim().toLowerCase());
+    if (hash === PASSCODE_HASH) {
       sessionStorage.setItem("gwUnlocked", "1");
+      sessionStorage.removeItem("gwAttempts");
       lockScreen.hidden = true;
     } else {
-      document.getElementById("lockError").textContent = "Wrong passcode";
+      const attempts = Number(sessionStorage.getItem("gwAttempts") || 0) + 1;
+      sessionStorage.setItem("gwAttempts", String(attempts));
+      if (attempts >= MAX_ATTEMPTS) {
+        sessionStorage.setItem("gwLockedUntil", String(Date.now() + LOCKOUT_MS));
+        sessionStorage.removeItem("gwAttempts");
+        updateLockUi();
+      } else {
+        document.getElementById("lockError").textContent = `Wrong passcode (${MAX_ATTEMPTS - attempts} attempt(s) left)`;
+      }
     }
   }
   document.getElementById("lockBtn").addEventListener("click", tryUnlock);
   document.getElementById("lockInput").addEventListener("keydown", e => {
     if (e.key === "Enter") tryUnlock();
   });
+  updateLockUi();
 </script>
 
 <div class="wrap">
@@ -169,6 +214,38 @@
             Open <code>blog/posts.js</code>, paste this object at the very top of the <code>POSTS = [ ... ]</code> array
             (don't forget the comma after it), then save, commit and push.
           </p>
+        </div>
+      </details>
+
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer; font-size:13px; font-weight:700; color:var(--muted);">Security</summary>
+        <p class="hint">
+          The passcode above is checked against a hash, not stored as plain text — but it's still only a
+          deterrent for casual visitors, not real security. The actual thing keeping this repo safe is that
+          nobody else has your GitHub token. Two things worth doing:
+        </p>
+        <ul class="hint" style="padding-left:18px;">
+          <li>Use a real passphrase here (three or four random words), not a short word — the hash can be
+            cracked offline by anyone who reads the page source, just not instantly.</li>
+          <li>Make sure your GitHub token (further down) is a <strong>fine-grained</strong> token scoped to
+            only this repository with only <strong>Contents: Read and write</strong>, and give it an
+            expiration date — so a leaked token is limited in both what it can touch and how long it works.</li>
+        </ul>
+        <p class="hint" style="margin-top:14px; font-weight:700;">Change the passcode</p>
+        <div class="two-col">
+          <div class="field" style="grid-column: span 2;">
+            <input type="text" id="newPasscodeInput" placeholder="Type a new passcode" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          </div>
+        </div>
+        <button class="btn btn-outline" id="hashPasscodeBtn">Generate hash</button>
+        <div id="passcodeHashBox" style="display:none; margin-top:14px;">
+          <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:8px;">
+            Paste this over the PASSCODE_HASH line near the top of admin.html
+          </label>
+          <textarea class="code-output" id="passcodeHashOutput" readonly style="min-height:60px;"></textarea>
+          <div class="actions-row">
+            <button class="btn btn-outline" id="copyPasscodeHashBtn">Copy line</button>
+          </div>
         </div>
       </details>
     </div>
@@ -391,6 +468,25 @@
       showToast("Copied — paste it into posts.js");
     } catch (e) {
       document.getElementById("codeOutput").select();
+      showToast("Press Ctrl/Cmd+C to copy");
+    }
+  });
+
+  document.getElementById("hashPasscodeBtn").addEventListener("click", async () => {
+    const value = document.getElementById("newPasscodeInput").value.trim();
+    if (!value) { showToast("Type a new passcode first"); return; }
+    const hash = await sha256Hex(value.toLowerCase());
+    document.getElementById("passcodeHashOutput").value = `const PASSCODE_HASH = "${hash}";`;
+    document.getElementById("passcodeHashBox").style.display = "block";
+  });
+
+  document.getElementById("copyPasscodeHashBtn").addEventListener("click", async () => {
+    const text = document.getElementById("passcodeHashOutput").value;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied — paste it over PASSCODE_HASH near the top of admin.html");
+    } catch (e) {
+      document.getElementById("passcodeHashOutput").select();
       showToast("Press Ctrl/Cmd+C to copy");
     }
   });
