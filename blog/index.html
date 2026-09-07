@@ -46,6 +46,7 @@
 </div>
 
 <script src="posts.js"></script>
+<script src="labels.js"></script>
 <script src="app.js"></script>
 <script>
   document.getElementById("year").textContent = new Date().getFullYear();
@@ -56,20 +57,12 @@
   const gridEl = document.getElementById("archive");
   let activeTag = null;
 
-  function uniqueTags(list) {
-    const tags = [];
-    list.forEach(p => p.items.forEach(i => {
-      if (i.tag && !tags.includes(i.tag)) tags.push(i.tag);
-    }));
-    return tags;
-  }
-
   function renderFilterBar() {
-    const tags = uniqueTags(posts);
-    if (!tags.length) { filterBarEl.innerHTML = ""; return; }
+    const labels = (typeof LABELS !== "undefined") ? LABELS : [];
+    if (!labels.length) { filterBarEl.innerHTML = ""; return; }
     filterBarEl.innerHTML = `
       <button class="filter-pill${activeTag === null ? " active" : ""}" data-tag="">All</button>
-      ${tags.map(t => `<button class="filter-pill${activeTag === t ? " active" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+      ${labels.map(t => `<button class="filter-pill${activeTag === t ? " active" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
     `;
     filterBarEl.querySelectorAll(".filter-pill").forEach(btn => {
       btn.addEventListener("click", () => {
