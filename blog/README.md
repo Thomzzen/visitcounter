@@ -144,8 +144,10 @@ No hash to regenerate, no file to edit — just go back to the Worker's
   match whichever program(s) you actually join (e.g. the exact required
   phrasing for Amazon Associates, or your local rules if you're not
   targeting a US audience).
-- There's no image upload — every image (cover + each gadget) is just a
-  URL. Use a direct link to a product photo, or your own hosted image.
+- Every image field (cover + each gadget) also has an **Upload** button next
+  to it — pick a file from your device and it's committed straight into
+  `blog/uploads/` and the URL field fills in automatically. Pasting a direct
+  URL to a product photo still works too, if you'd rather not upload one.
 
 ## Local preview
 

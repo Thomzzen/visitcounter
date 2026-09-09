@@ -96,7 +96,6 @@
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="index.html">Home</a>
-      <a href="index.html#archive">Archive</a>
     </div>
   </nav>
 
@@ -173,8 +172,13 @@
         <input type="text" id="f-title" placeholder="10 Fun & Handy Gadgets Worth Buying This Week">
       </div>
       <div class="field">
-        <label>Cover image URL</label>
-        <input type="text" id="f-cover" placeholder="https://...">
+        <label>Cover image</label>
+        <div class="upload-row">
+          <input type="text" id="f-cover" placeholder="https://... or upload a file">
+          <input type="file" id="f-cover-file" accept="image/*" hidden>
+          <button type="button" class="btn btn-outline" id="f-cover-upload-btn">Upload</button>
+        </div>
+        <p class="hint" id="f-cover-upload-hint" style="margin-top:6px;"></p>
       </div>
       <div class="field">
         <label>Excerpt (short teaser shown on the homepage)</label>
@@ -304,7 +308,15 @@
         <div class="field"><label>Name</label><input type="text" class="i-name" value="${escapeHtml(item.name)}"></div>
         <div class="field"><label>Price</label><input type="text" class="i-price" value="${escapeHtml(item.price)}" placeholder="$29"></div>
       </div>
-      <div class="field"><label>Image URL</label><input type="text" class="i-image" value="${escapeHtml(item.image)}" placeholder="https://..."></div>
+      <div class="field">
+        <label>Image</label>
+        <div class="upload-row">
+          <input type="text" class="i-image" value="${escapeHtml(item.image)}" placeholder="https://... or upload a file">
+          <input type="file" class="i-image-file" accept="image/*" hidden>
+          <button type="button" class="btn btn-outline i-image-upload-btn">Upload</button>
+        </div>
+        <p class="hint i-image-upload-hint" style="margin-top:6px;"></p>
+      </div>
       <div class="field"><label>Why it's worth it</label><textarea class="i-blurb" rows="2">${escapeHtml(item.blurb)}</textarea></div>
       <div class="two-col">
         <div class="field"><label>Tag (optional)</label><select class="i-tag">${tagOptionsHtml(item.tag)}</select></div>
@@ -317,6 +329,12 @@
       updatePreview();
     });
     row.querySelectorAll("input, textarea, select").forEach(el => el.addEventListener("input", updatePreview));
+    wireImageUpload(
+      row.querySelector(".i-image-file"),
+      row.querySelector(".i-image-upload-btn"),
+      row.querySelector(".i-image"),
+      row.querySelector(".i-image-upload-hint")
+    );
     return row;
   }
 
@@ -525,6 +543,69 @@
     return res.json();
   }
 
+  const SITE_BASE = "https://thomzzen.github.io/visitcounter/blog";
+  const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+  function sanitizeUploadName(name) {
+    const dot = name.lastIndexOf(".");
+    const ext = dot > -1 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+    const base = (dot > -1 ? name.slice(0, dot) : name)
+      .toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    return `${Date.now()}-${base || "image"}${ext ? "." + ext : ""}`;
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = () => reject(new Error("Could not read that file"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadImageToGithub(file) {
+    if (!getToken()) throw new Error("Connect GitHub first — see the panel above");
+    if (!file.type.startsWith("image/")) throw new Error("That's not an image file");
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error("Image is too large — keep it under 8MB");
+    const base64 = await readFileAsBase64(file);
+    const filename = sanitizeUploadName(file.name || "image");
+    await githubRequest(`/contents/blog/uploads/${filename}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Add image: ${filename}`,
+        content: base64,
+        branch: GITHUB_BRANCH
+      })
+    });
+    return `${SITE_BASE}/uploads/${filename}`;
+  }
+
+  function wireImageUpload(fileInput, uploadBtn, textInput, hintEl) {
+    uploadBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = "Uploading…";
+      hintEl.textContent = "Uploading…";
+      try {
+        const url = await uploadImageToGithub(file);
+        textInput.value = url;
+        textInput.dispatchEvent(new Event("input"));
+        hintEl.textContent = "Uploaded. Live in about a minute.";
+        showToast("Image uploaded");
+      } catch (err) {
+        hintEl.textContent = "Upload failed: " + err.message;
+        showToast("Upload failed: " + err.message);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "Upload";
+        fileInput.value = "";
+      }
+    });
+  }
+
   async function fetchPostsJsFile() {
     const data = await githubRequest(`/contents/blog/posts.js?ref=${GITHUB_BRANCH}`);
     return { text: b64DecodeUnicode(data.content), sha: data.sha };
@@ -718,6 +799,13 @@
   document.getElementById("newLabelInput").addEventListener("keydown", e => {
     if (e.key === "Enter") addLabel();
   });
+
+  wireImageUpload(
+    document.getElementById("f-cover-file"),
+    document.getElementById("f-cover-upload-btn"),
+    document.getElementById("f-cover"),
+    document.getElementById("f-cover-upload-hint")
+  );
 
   refreshGhStatus();
   refreshPicker();

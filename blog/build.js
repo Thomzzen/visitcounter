@@ -100,7 +100,6 @@ ${jsonLd}
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="../index.html">Home</a>
-      <a href="../index.html#archive">Archive</a>
     </div>
   </nav>
 
