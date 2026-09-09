@@ -29,12 +29,14 @@ const sandbox = {
 };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(BLOG_DIR, "posts.js"), "utf8"), sandbox, { filename: "posts.js" });
-// `const POSTS` is a lexical binding, not a property of the sandbox's
-// global object — copy it across explicitly so Node can read it below.
-vm.runInContext("this.POSTS = POSTS;", sandbox);
+vm.runInContext(fs.readFileSync(path.join(BLOG_DIR, "categories.js"), "utf8"), sandbox, { filename: "categories.js" });
+// `const POSTS`/`const CATEGORIES` are lexical bindings, not properties of
+// the sandbox's global object — copy them across explicitly so Node can
+// read them below.
+vm.runInContext("this.POSTS = POSTS; this.CATEGORIES = CATEGORIES;", sandbox);
 vm.runInContext(fs.readFileSync(path.join(BLOG_DIR, "app.js"), "utf8"), sandbox, { filename: "app.js" });
 
-const { POSTS, itemCardHtml, disclosureHtml, formatDate, escapeHtml } = sandbox;
+const { POSTS, itemCardHtml, disclosureHtml, formatDate, escapeHtml, categoryMenuHtml } = sandbox;
 
 const posts = POSTS.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
 
@@ -61,7 +63,7 @@ function jsonLdFor(post, url) {
 
 function pageHtml(post) {
   const url = `${SITE_URL}/posts/${post.id}.html`;
-  const all = posts;
+  const all = posts.filter(p => p.category === post.category);
   const idx = all.findIndex(p => p.id === post.id);
   const prev = all[idx + 1]; // older
   const next = all[idx - 1]; // newer
@@ -100,6 +102,11 @@ ${jsonLd}
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="../index.html">Home</a>
+      <a href="../about.html">About</a>
+      <details class="nav-dropdown">
+        <summary>Categories</summary>
+        <div class="nav-dropdown-menu">${categoryMenuHtml("../", post.category)}</div>
+      </details>
     </div>
   </nav>
 
@@ -137,6 +144,7 @@ ${jsonLd}
 function sitemapXml() {
   const urls = [
     { loc: `${SITE_URL}/`, changefreq: "weekly" },
+    { loc: `${SITE_URL}/about.html`, changefreq: "monthly" },
     ...posts.map(p => ({ loc: `${SITE_URL}/posts/${p.id}.html`, lastmod: p.date, changefreq: "monthly" }))
   ];
   const body = urls.map(u => `  <url>

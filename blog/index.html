@@ -24,13 +24,18 @@
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="index.html" class="active">Home</a>
+      <a href="about.html">About</a>
+      <details class="nav-dropdown">
+        <summary>Categories</summary>
+        <div class="nav-dropdown-menu" id="categoryMenu"></div>
+      </details>
     </div>
   </nav>
 
   <section class="hero" id="hero"></section>
 
   <div class="section-label">
-    <span>Latest drops</span>
+    <span id="sectionLabelText">Latest drops</span>
     <div class="line"></div>
     <button class="icon-btn" onclick="document.getElementById('archive').scrollIntoView({behavior:'smooth'})" title="See all posts">&darr;</button>
   </div>
@@ -47,18 +52,38 @@
 
 <script src="posts.js"></script>
 <script src="labels.js"></script>
+<script src="categories.js"></script>
 <script src="app.js"></script>
 <script>
   document.getElementById("year").textContent = new Date().getFullYear();
 
-  const posts = loadAllPosts();
+  const categories = (typeof CATEGORIES !== "undefined") ? CATEGORIES : [];
+  const requestedCat = new URLSearchParams(location.search).get("cat");
+  const currentCat = categories.length
+    ? (categories.some(c => c.id === requestedCat) ? requestedCat : categories[0].id)
+    : null;
+
+  document.getElementById("categoryMenu").innerHTML = categoryMenuHtml("", currentCat);
+  wireNavDropdowns();
+
+  const allPosts = loadAllPosts();
+  const posts = currentCat ? allPosts.filter(p => p.category === currentCat) : allPosts;
   const heroEl = document.getElementById("hero");
   const filterBarEl = document.getElementById("filterBar");
   const gridEl = document.getElementById("archive");
   let activeTag = null;
 
+  if (currentCat && categories.length > 1) {
+    document.getElementById("sectionLabelText").textContent = `Latest in ${categoryName(currentCat)}`;
+  }
+
+  function currentLabels() {
+    if (!currentCat || typeof LABELS === "undefined") return [];
+    return LABELS[currentCat] || [];
+  }
+
   function renderFilterBar() {
-    const labels = (typeof LABELS !== "undefined") ? LABELS : [];
+    const labels = currentLabels();
     if (!labels.length) { filterBarEl.innerHTML = ""; return; }
     filterBarEl.innerHTML = `
       <button class="filter-pill${activeTag === null ? " active" : ""}" data-tag="">All</button>
@@ -81,17 +106,19 @@
   }
 
   if (posts.length === 0) {
-    heroEl.outerHTML = `<div class="empty-state">No posts yet. Head to <a href="admin.html"><strong>Write a post</strong></a> to publish your first Top 10.</div>`;
+    heroEl.outerHTML = allPosts.length
+      ? `<div class="empty-state">No posts in ${escapeHtml(categoryName(currentCat))} yet. Head to <a href="admin.html"><strong>Write a post</strong></a> to publish the first one.</div>`
+      : `<div class="empty-state">No posts yet. Head to <a href="admin.html"><strong>Write a post</strong></a> to publish your first Top 10.</div>`;
   } else {
     const latest = posts[0];
+    const heroWord = currentCat ? categoryName(currentCat).toLowerCase() : "gadgets";
     heroEl.innerHTML = `
       <div class="hero-copy">
         <div class="hero-eyebrow">${latest.weekLabel} &middot; ${formatDate(latest.date)}</div>
-        <h1>top 10<br>gadgets.</h1>
+        <h1>top 10<br>${escapeHtml(heroWord)}.</h1>
         <p class="lede">${escapeHtml(latest.excerpt)}</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="${postHref(latest)}">Read this week's list &rarr;</a>
-          <a class="btn btn-outline" href="#archive">Browse archive</a>
         </div>
       </div>
       <a class="hero-visual" href="${postHref(latest)}">

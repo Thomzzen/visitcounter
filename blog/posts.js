@@ -1,6 +1,8 @@
 /*
  * POSTS is the database for the whole site.
- * Each object below is one weekly "Top 10" post.
+ * Each object below is one weekly "Top 10" post. Its `category` field must
+ * match one of the ids in categories.js — that's what puts it on the right
+ * page and gives it the right set of filter labels.
  *
  * TO ADD A NEW WEEK BY HAND:
  *   1. Copy one of the objects below (the { ... } block) including the comma after it.
@@ -14,6 +16,7 @@
 const POSTS = [
   {
     id: "week-37-2026",
+    category: "gadgets",
     weekLabel: "Week 37",
     title: "10 Fun & Handy Gadgets Worth Buying This Week",
     date: "2026-09-13",
@@ -114,6 +117,7 @@ const POSTS = [
   },
   {
     id: "week-36-2026",
+    category: "gadgets",
     weekLabel: "Week 36",
     title: "10 Kitchen & Home Gadgets That Are Actually Worth It",
     date: "2026-09-06",

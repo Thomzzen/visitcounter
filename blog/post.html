@@ -16,6 +16,11 @@
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <details class="nav-dropdown">
+        <summary>Categories</summary>
+        <div class="nav-dropdown-menu" id="categoryMenu"></div>
+      </details>
     </div>
   </nav>
 
@@ -28,6 +33,7 @@
 </div>
 
 <script src="posts.js"></script>
+<script src="categories.js"></script>
 <script src="app.js"></script>
 <script>
   document.getElementById("year").textContent = new Date().getFullYear();
@@ -37,13 +43,16 @@
   const post = id ? getPostById(id) : null;
   const contentEl = document.getElementById("content");
 
+  document.getElementById("categoryMenu").innerHTML = categoryMenuHtml("", post ? post.category : null);
+  wireNavDropdowns();
+
   if (!post) {
     contentEl.innerHTML = `<div class="empty-state">Couldn't find that post. <br><br><a class="btn btn-primary" href="index.html">Back to home</a></div>`;
   } else if (!post.isDraft) {
     // Published posts have a real, SEO-friendly page — send visitors there instead.
     location.replace(postHref(post));
   } else {
-    const all = loadAllPosts();
+    const all = loadAllPosts().filter(p => p.category === post.category);
     const idx = all.findIndex(p => p.id === post.id);
     const prev = all[idx + 1]; // older
     const next = all[idx - 1]; // newer

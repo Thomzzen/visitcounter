@@ -96,6 +96,11 @@
     <div class="brand"><span class="dot"></span> gadgetweekly.</div>
     <div class="nav-links">
       <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <details class="nav-dropdown">
+        <summary>Categories</summary>
+        <div class="nav-dropdown-menu" id="categoryMenu"></div>
+      </details>
     </div>
   </nav>
 
@@ -104,13 +109,32 @@
     <div class="line"></div>
   </div>
 
+  <div class="panel" id="categoriesPanel" style="margin-bottom:24px;">
+    <h2>Categories</h2>
+    <p class="hint" style="margin-top:0;">
+      These are the pages visitors reach from the "Categories" menu in the nav (e.g. Gadgets,
+      Sport items). Every post belongs to one, picked below in "Post details". A category can't
+      be removed while posts still use it.
+    </p>
+    <div class="filter-bar" id="categoryPills"></div>
+    <div class="select-line">
+      <input type="text" id="newCategoryInput" placeholder="New category, e.g. Sport items">
+      <button class="btn btn-primary" id="addCategoryBtn">+ Add category</button>
+    </div>
+    <p class="hint" id="categoriesHint"></p>
+  </div>
+
   <div class="panel" id="labelsPanel" style="margin-bottom:24px;">
     <h2>Filter labels</h2>
     <p class="hint" style="margin-top:0;">
-      These are the labels visitors can filter the homepage by, and what fills the "Tag" dropdown
-      for each gadget below. Add or remove one here — it publishes straight away (needs GitHub
-      connected below).
+      These are the labels visitors can filter by, kept separately per category/page below —
+      removing one here only affects the category selected, never any other page. They also fill
+      the "Tag" dropdown for each gadget below (needs GitHub connected below to publish).
     </p>
+    <div class="field" style="margin-bottom:14px;">
+      <label>Managing labels for</label>
+      <select id="labelsCategorySelect"></select>
+    </div>
     <div class="filter-bar" id="labelPills"></div>
     <div class="select-line">
       <input type="text" id="newLabelInput" placeholder="New label, e.g. Splurge">
@@ -157,6 +181,10 @@
       </div>
 
       <h2>2. Post details</h2>
+      <div class="field">
+        <label>Category</label>
+        <select id="f-category"></select>
+      </div>
       <div class="two-col">
         <div class="field">
           <label>Week label</label>
@@ -268,14 +296,18 @@
 
 <script src="posts.js"></script>
 <script src="labels.js"></script>
+<script src="categories.js"></script>
 <script src="app.js"></script>
 <script>
   const itemsEl = document.getElementById("items");
   const postPicker = document.getElementById("postPicker");
   let editingId = null;
-  let labels = (typeof LABELS !== "undefined") ? LABELS.slice() : [];
+  let categories = (typeof CATEGORIES !== "undefined") ? CATEGORIES.slice() : [];
+  let allLabels = (typeof LABELS !== "undefined") ? JSON.parse(JSON.stringify(LABELS)) : {};
+  let activeLabelCategory = categories[0] ? categories[0].id : null;
 
   const fields = {
+    category: document.getElementById("f-category"),
     weekLabel: document.getElementById("f-weekLabel"),
     date: document.getElementById("f-date"),
     title: document.getElementById("f-title"),
@@ -292,10 +324,18 @@
   }
 
   function tagOptionsHtml(selected) {
-    const list = labels.slice();
+    const list = (allLabels[fields.category.value] || []).slice();
     if (selected && !list.includes(selected)) list.push(selected);
     return `<option value="">No tag</option>` +
       list.map(l => `<option value="${escapeHtml(l)}"${l === selected ? " selected" : ""}>${escapeHtml(l)}</option>`).join("");
+  }
+
+  function refreshItemTagOptions() {
+    itemsEl.querySelectorAll(".item-row").forEach(row => {
+      const select = row.querySelector(".i-tag");
+      const current = select.value;
+      select.innerHTML = tagOptionsHtml(current);
+    });
   }
 
   function renderItemRow(item, index) {
@@ -354,9 +394,11 @@
   });
 
   Object.values(fields).forEach(el => el.addEventListener("input", updatePreview));
+  fields.category.addEventListener("input", refreshItemTagOptions);
 
   function resetForm() {
     editingId = null;
+    fields.category.value = categories[0] ? categories[0].id : "";
     fields.weekLabel.value = "";
     fields.date.value = new Date().toISOString().slice(0, 10);
     fields.title.value = "";
@@ -370,6 +412,7 @@
 
   function loadPostIntoForm(post) {
     editingId = post.id;
+    fields.category.value = post.category || (categories[0] ? categories[0].id : "");
     fields.weekLabel.value = post.weekLabel || "";
     fields.date.value = post.date || "";
     fields.title.value = post.title || "";
@@ -396,9 +439,11 @@
     const weekLabel = fields.weekLabel.value.trim() || "Week ?";
     const date = fields.date.value || new Date().toISOString().slice(0, 10);
     const id = editingId || `${slugify(weekLabel)}-${date.slice(0, 4)}`;
+    const category = fields.category.value || (categories[0] ? categories[0].id : "");
 
     return {
       id,
+      category,
       weekLabel,
       title: fields.title.value.trim() || "Untitled post",
       date,
@@ -414,6 +459,7 @@
     previewEl.innerHTML = `
       <div class="post-hero" style="padding:28px;">
         <div class="badge-row">
+          ${post.category ? `<span class="pill-tag">${escapeHtml(categoryName(post.category) || post.category)}</span>` : ""}
           <span class="pill-tag">${escapeHtml(post.weekLabel)}</span>
           <span class="pill-tag">${formatDate(post.date)}</span>
         </div>
@@ -711,7 +757,130 @@
     }
   });
 
-  /* ---------- Manage filter labels ---------- */
+  /* ---------- Manage categories ---------- */
+
+  async function fetchCategoriesJsFile() {
+    const data = await githubRequest(`/contents/blog/categories.js?ref=${GITHUB_BRANCH}`);
+    return { sha: data.sha };
+  }
+
+  async function publishCategories() {
+    const { sha } = await fetchCategoriesJsFile();
+    const content = `/*\n * CATEGORIES is the managed list of content categories (e.g. "Gadgets",\n * "Sport items"). Each post belongs to one, and they show up as the\n * "Categories" dropdown in the nav so visitors can jump between them.\n *\n * Manage this from admin.html's "Categories" panel (add/remove there\n * publishes straight to this file), or edit the array by hand and push.\n */\nconst CATEGORIES = ${JSON.stringify(categories, null, 2)};\n`;
+    await githubRequest(`/contents/blog/categories.js`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Update categories",
+        content: b64EncodeUnicode(content),
+        sha,
+        branch: GITHUB_BRANCH
+      })
+    });
+  }
+
+  function renderCategoryPills() {
+    const el = document.getElementById("categoryPills");
+    el.innerHTML = categories.map(c => `
+      <span class="filter-pill" style="display:inline-flex; align-items:center; gap:8px; cursor:default;">
+        ${escapeHtml(c.name)}
+        <button type="button" class="remove-category-btn" data-id="${escapeHtml(c.id)}" title="Remove" style="background:none; border:none; color:inherit; cursor:pointer; font-weight:800; font-size:14px; line-height:1; padding:0;">&times;</button>
+      </span>
+    `).join("") || `<p class="hint" style="margin:0;">No categories yet — add one below.</p>`;
+    el.querySelectorAll(".remove-category-btn").forEach(btn => {
+      btn.addEventListener("click", () => removeCategory(btn.dataset.id));
+    });
+    renderCategorySelect();
+    renderLabelsCategorySelect();
+  }
+
+  function renderCategorySelect() {
+    const sel = fields.category;
+    const current = sel.value;
+    sel.innerHTML = categories.length
+      ? categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("")
+      : `<option value="">No categories yet</option>`;
+    if (categories.some(c => c.id === current)) sel.value = current;
+  }
+
+  function renderLabelsCategorySelect() {
+    const sel = document.getElementById("labelsCategorySelect");
+    const current = sel.value || activeLabelCategory;
+    sel.innerHTML = categories.length
+      ? categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("")
+      : `<option value="">No categories yet</option>`;
+    activeLabelCategory = categories.some(c => c.id === current) ? current : (categories[0] ? categories[0].id : null);
+    sel.value = activeLabelCategory || "";
+  }
+
+  async function addCategory() {
+    const input = document.getElementById("newCategoryInput");
+    const name = input.value.trim();
+    const hint = document.getElementById("categoriesHint");
+    if (!name) { showToast("Type a category name first"); return; }
+    const id = slugify(name);
+    if (!id) { showToast("That name doesn't work as a category"); return; }
+    if (categories.some(c => c.id === id)) { showToast("That category already exists"); return; }
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
+    const prevCategories = categories.slice();
+    categories.push({ id, name });
+    renderCategoryPills();
+    input.value = "";
+    hint.textContent = "Publishing…";
+    try {
+      await publishCategories();
+      hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
+      showToast("Category added");
+    } catch (err) {
+      categories = prevCategories;
+      renderCategoryPills();
+      hint.textContent = "Failed: " + err.message;
+      showToast("Failed to add category: " + err.message);
+    }
+  }
+
+  async function removeCategory(id) {
+    const hint = document.getElementById("categoriesHint");
+    const posts = (typeof POSTS !== "undefined") ? POSTS : [];
+    const inUse = posts.filter(p => p.category === id).length;
+    if (inUse) {
+      showToast(`${inUse} post(s) still use this category — move or delete them first`);
+      return;
+    }
+    if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
+    const prevCategories = categories.slice();
+    const prevLabels = JSON.parse(JSON.stringify(allLabels));
+    categories = categories.filter(c => c.id !== id);
+    delete allLabels[id];
+    renderCategoryPills();
+    hint.textContent = "Publishing…";
+    try {
+      await publishCategories();
+      await publishLabels();
+      renderLabelPills();
+      hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
+      showToast("Category removed");
+    } catch (err) {
+      categories = prevCategories;
+      allLabels = prevLabels;
+      renderCategoryPills();
+      renderLabelPills();
+      hint.textContent = "Failed: " + err.message;
+      showToast("Failed to remove category: " + err.message);
+    }
+  }
+
+  document.getElementById("addCategoryBtn").addEventListener("click", addCategory);
+  document.getElementById("newCategoryInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") addCategory();
+  });
+
+  document.getElementById("labelsCategorySelect").addEventListener("change", e => {
+    activeLabelCategory = e.target.value;
+    renderLabelPills();
+  });
+
+  /* ---------- Manage filter labels (scoped per category) ---------- */
 
   async function fetchLabelsJsFile() {
     const data = await githubRequest(`/contents/blog/labels.js?ref=${GITHUB_BRANCH}`);
@@ -720,7 +889,7 @@
 
   async function publishLabels() {
     const { sha } = await fetchLabelsJsFile();
-    const content = `/*\n * LABELS is the managed list of filter labels shown as pills on the\n * homepage, and offered as the "Tag" dropdown for each gadget in\n * admin.html.\n *\n * Manage this from admin.html's "Filter labels" panel (add/remove there\n * publishes straight to this file), or edit the array by hand and push.\n */\nconst LABELS = ${JSON.stringify(labels, null, 2)};\n`;
+    const content = `/*\n * LABELS is the managed list of filter labels shown as pills on the\n * homepage, and offered as the "Tag" dropdown for each gadget in\n * admin.html — kept separately per category, so removing a label from\n * one category's page never touches any other category's list.\n *\n * Manage this from admin.html's "Filter labels" panel (add/remove there\n * publishes straight to this file), or edit the object by hand and push.\n */\nconst LABELS = ${JSON.stringify(allLabels, null, 2)};\n`;
     await githubRequest(`/contents/blog/labels.js`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -733,34 +902,34 @@
     });
   }
 
+  function currentLabelsArray() {
+    return allLabels[activeLabelCategory] || [];
+  }
+
   function renderLabelPills() {
     const el = document.getElementById("labelPills");
-    el.innerHTML = labels.map(l => `
+    el.innerHTML = currentLabelsArray().map(l => `
       <span class="filter-pill" style="display:inline-flex; align-items:center; gap:8px; cursor:default;">
         ${escapeHtml(l)}
         <button type="button" class="remove-label-btn" data-label="${escapeHtml(l)}" title="Remove" style="background:none; border:none; color:inherit; cursor:pointer; font-weight:800; font-size:14px; line-height:1; padding:0;">&times;</button>
       </span>
-    `).join("") || `<p class="hint" style="margin:0;">No labels yet — add one below.</p>`;
+    `).join("") || `<p class="hint" style="margin:0;">No labels yet for this category — add one below.</p>`;
     el.querySelectorAll(".remove-label-btn").forEach(btn => {
       btn.addEventListener("click", () => removeLabel(btn.dataset.label));
     });
-    // keep every open Tag dropdown in sync with the current label list
-    itemsEl.querySelectorAll(".item-row").forEach(row => {
-      const select = row.querySelector(".i-tag");
-      const current = select.value;
-      select.innerHTML = tagOptionsHtml(current);
-    });
+    refreshItemTagOptions();
   }
 
   async function addLabel() {
     const input = document.getElementById("newLabelInput");
     const value = input.value.trim();
     const hint = document.getElementById("labelsHint");
+    if (!activeLabelCategory) { showToast("Add a category first"); return; }
     if (!value) { showToast("Type a label first"); return; }
-    if (labels.includes(value)) { showToast("That label already exists"); return; }
+    if (currentLabelsArray().includes(value)) { showToast("That label already exists on this page"); return; }
     if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
-    const prev = labels.slice();
-    labels.push(value);
+    const prev = JSON.parse(JSON.stringify(allLabels));
+    allLabels[activeLabelCategory] = [...currentLabelsArray(), value];
     renderLabelPills();
     input.value = "";
     hint.textContent = "Publishing…";
@@ -769,7 +938,7 @@
       hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
       showToast("Label added");
     } catch (err) {
-      labels = prev;
+      allLabels = prev;
       renderLabelPills();
       hint.textContent = "Failed: " + err.message;
       showToast("Failed to add label: " + err.message);
@@ -779,8 +948,8 @@
   async function removeLabel(label) {
     if (!getToken()) { showToast("Connect GitHub first — see the panel below"); return; }
     const hint = document.getElementById("labelsHint");
-    const prev = labels.slice();
-    labels = labels.filter(l => l !== label);
+    const prev = JSON.parse(JSON.stringify(allLabels));
+    allLabels[activeLabelCategory] = currentLabelsArray().filter(l => l !== label);
     renderLabelPills();
     hint.textContent = "Publishing…";
     try {
@@ -788,7 +957,7 @@
       hint.textContent = "Published. Reload the page in a minute to see it everywhere.";
       showToast("Label removed");
     } catch (err) {
-      labels = prev;
+      allLabels = prev;
       renderLabelPills();
       hint.textContent = "Failed: " + err.message;
       showToast("Failed to remove label: " + err.message);
@@ -807,6 +976,10 @@
     document.getElementById("f-cover-upload-hint")
   );
 
+  document.getElementById("categoryMenu").innerHTML = categoryMenuHtml("");
+  wireNavDropdowns();
+
+  renderCategoryPills();
   refreshGhStatus();
   refreshPicker();
   resetForm();
