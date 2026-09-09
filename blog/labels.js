@@ -6,6 +6,4 @@
  * Manage this from admin.html's "Filter labels" panel (add/remove there
  * publishes straight to this file), or edit the array by hand and push.
  */
-const LABELS = [
-  "Budget Pick"
-];
+const LABELS = [];
