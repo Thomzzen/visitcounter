@@ -7,5 +7,12 @@
  * publishes straight to this file), or edit the array by hand and push.
  */
 const CATEGORIES = [
-  { id: "gadgets", name: "Gadgets" }
+  {
+    "id": "gadgets",
+    "name": "Gadgets"
+  },
+  {
+    "id": "sports",
+    "name": "Sports"
+  }
 ];
