@@ -27,8 +27,19 @@ jobs:
           enablement: true
       - name: Generate static post pages + sitemap
         run: node blog/build.js
+      - name: Decide what to deploy
+        id: sitepath
+        run: |
+          if [ -f OFFLINE ]; then
+            echo "OFFLINE marker found -- deploying the maintenance placeholder instead of the real site."
+            mkdir -p _offline_site
+            cp maintenance.html _offline_site/index.html
+            echo "path=./_offline_site" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=." >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: ${{ steps.sitepath.outputs.path }}
       - id: deployment
         uses: actions/deploy-pages@v4
