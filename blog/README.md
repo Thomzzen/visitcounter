@@ -41,6 +41,10 @@ directly to the GitHub API using a token you paste in once (see "Security" below
 4. To fix or update a post later: pick it from the "Pick a post" dropdown at
    the top, change what you need, and click **Publish to website** again —
    it updates that same post in place instead of creating a new one.
+5. To remove a published post entirely: pick it from the dropdown and click
+   **Delete from website** (it asks you to confirm first). It commits the
+   removal straight to `posts.js`, live within a minute or two — there's no
+   undo from here, so make sure you picked the right one.
 
 Two extra tools if you want them:
 - **Save draft (preview only)** saves to your browser's local storage so you

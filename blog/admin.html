@@ -225,6 +225,7 @@
         <button class="btn btn-primary" id="publishBtn">Publish to website</button>
         <button class="btn btn-outline" id="saveDraftBtn">Save draft (preview only)</button>
         <button class="btn btn-outline" id="deleteDraftBtn">Delete this draft</button>
+        <button class="btn btn-danger" id="deletePostBtn">Delete from website</button>
       </div>
       <p class="hint" id="publishHint"></p>
 
@@ -515,6 +516,41 @@
     showToast("Draft deleted");
   });
 
+  document.getElementById("deletePostBtn").addEventListener("click", async () => {
+    if (!editingId || (typeof POSTS === "undefined") || !POSTS.some(p => p.id === editingId)) {
+      showToast("Pick a published post from the dropdown first");
+      return;
+    }
+    if (!getToken()) {
+      showToast("Connect GitHub first — see the panel above");
+      document.getElementById("githubPanel").scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    const post = getPostById(editingId);
+    if (!confirm(`Delete "${post ? post.title : editingId}" from the website? This can't be undone from here.`)) return;
+
+    const btn = document.getElementById("deletePostBtn");
+    const hint = document.getElementById("publishHint");
+    btn.disabled = true;
+    btn.textContent = "Deleting…";
+    hint.textContent = "";
+    try {
+      await deletePostFromGithub(editingId);
+      deleteDraft(editingId);
+      showToast("Deleted. Live in about a minute.");
+      hint.textContent = "Reload this page in a minute or two before publishing another post, so it starts from the latest posts.js.";
+      postPicker.value = "";
+      resetForm();
+      refreshPicker();
+    } catch (err) {
+      showToast("Delete failed: " + err.message);
+      hint.textContent = "Delete failed: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Delete from website";
+    }
+  });
+
   document.getElementById("generateBtn").addEventListener("click", () => {
     const post = buildPostFromForm();
     if (!post.items.length) { showToast("Add at least one gadget first"); return; }
@@ -693,6 +729,47 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: isEdit ? `Update post: ${post.title}` : `Add post: ${post.title}`,
+        content: b64EncodeUnicode(updated),
+        sha,
+        branch: GITHUB_BRANCH
+      })
+    });
+  }
+
+  function removePostBlock(fileText, id) {
+    const marker = `id: "${id}"`;
+    const markerIdx = fileText.indexOf(marker);
+    if (markerIdx === -1) throw new Error("Could not find that post in posts.js to delete");
+    const start = fileText.lastIndexOf("{", markerIdx);
+    if (start === -1) throw new Error("Could not locate the start of the post block");
+    let depth = 0, end = -1;
+    for (let i = start; i < fileText.length; i++) {
+      if (fileText[i] === "{") depth++;
+      else if (fileText[i] === "}") {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    if (end === -1) throw new Error("Could not locate the end of the post block");
+    // consume a trailing comma (and whitespace) after the block, and the
+    // leading whitespace before it, so deleting doesn't leave a blank line
+    let after = end + 1;
+    while (after < fileText.length && /\s/.test(fileText[after])) after++;
+    if (fileText[after] === ",") after++;
+    let before = start;
+    while (before > 0 && /[ \t]/.test(fileText[before - 1])) before--;
+    if (fileText[before - 1] === "\n") before--;
+    return fileText.slice(0, before) + fileText.slice(after);
+  }
+
+  async function deletePostFromGithub(id) {
+    const { text, sha } = await fetchPostsJsFile();
+    const updated = removePostBlock(text, id);
+    await githubRequest(`/contents/blog/posts.js`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Delete post: ${id}`,
         content: b64EncodeUnicode(updated),
         sha,
         branch: GITHUB_BRANCH
