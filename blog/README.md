@@ -29,19 +29,29 @@ directly to the GitHub API using a token you paste in once (see "Security" below
 
 1. Open `admin.html` and enter the passcode (see "Security" below for how
    that's stored).
-2. Pick a **Category** for the post (see "Categories & filter labels" below
-   if you want to add a new one first), then fill in the week label, title,
-   date, cover image and the 10 gadgets (name, image or upload, a sentence
-   on why it's worth it, price, optional tag, affiliate/buy link). The live
-   preview on the right updates as you type.
-3. Click **Publish to website**. The page commits the post to `posts.js` for
+2. Pick a **Post type**:
+   - **Top 10 list** — the original format: a week label, title, date, cover,
+     excerpt and 10 ranked gadgets (name, image or upload, a sentence on why
+     it's worth it, price, optional tag, affiliate/buy link).
+   - **Long-form review** — a single-product deep dive instead of a ranked
+     list: product name/image/price/buy link, an introduction, any number of
+     `## Heading` sections (blank line between sections, `- ` lines become
+     bullet points), pros/cons (one per line), a verdict, and an FAQ written
+     as `Q: ...` / `A: ...` pairs. This is the format worth reaching for when
+     SEO is the goal — a focused review page on one product can actually rank,
+     where a "Top 10" post's items compete with every other Top 10 list for
+     the same broad keywords.
+3. Pick a **Category** for the post (see "Categories & filter labels" below
+   if you want to add a new one first), fill in the rest, and watch the live
+   preview on the right update as you type.
+4. Click **Publish to website**. The page commits the post to `posts.js` for
    you directly via the GitHub API — no copy-pasting, no editing files by
    hand. GitHub Actions then builds a real static page for it and deploys,
    usually live within a minute or two.
-4. To fix or update a post later: pick it from the "Pick a post" dropdown at
+5. To fix or update a post later: pick it from the "Pick a post" dropdown at
    the top, change what you need, and click **Publish to website** again —
    it updates that same post in place instead of creating a new one.
-5. To remove a published post entirely: pick it from the dropdown and click
+6. To remove a published post entirely: pick it from the dropdown and click
    **Delete from website** (it asks you to confirm first). It commits the
    removal straight to `posts.js`, live within a minute or two — there's no
    undo from here, so make sure you picked the right one.

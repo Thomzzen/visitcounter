@@ -70,9 +70,7 @@
         ${disclosureHtml("")}
       </div>
 
-      <div class="item-list">
-        ${post.items.map(itemCardHtml).join("")}
-      </div>
+      ${postBodyHtml(post)}
 
       <div class="archive-nav">
         ${prev ? `<a class="btn btn-outline" href="post.html?id=${encodeURIComponent(prev.id)}">&larr; ${escapeHtml(prev.weekLabel)}</a>` : `<span></span>`}

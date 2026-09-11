@@ -182,6 +182,13 @@
 
       <h2>2. Post details</h2>
       <div class="field">
+        <label>Post type</label>
+        <select id="f-postType">
+          <option value="list">Top 10 list</option>
+          <option value="review">Long-form review (single product)</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Category</label>
         <select id="f-category"></select>
       </div>
@@ -213,13 +220,88 @@
         <textarea id="f-excerpt" rows="2" placeholder="One or two sentences about this week's list."></textarea>
       </div>
 
-      <h2 style="margin-top:28px;">3. The 10 gadgets</h2>
-      <p class="hint" style="margin-top:-12px; margin-bottom:16px;">
-        Paste your real affiliate links in "Affiliate / buy link" (Amazon Associates, Awin, Coolblue, etc.).
-        Every generated page already discloses affiliate use and marks these links <code>rel="sponsored"</code> for you.
-      </p>
-      <div id="items"></div>
-      <button class="btn btn-outline" id="addItemBtn">+ Add a gadget</button>
+      <div id="listFields">
+        <h2 style="margin-top:28px;">3. The 10 gadgets</h2>
+        <p class="hint" style="margin-top:-12px; margin-bottom:16px;">
+          Paste your real affiliate links in "Affiliate / buy link" (Amazon Associates, Awin, Coolblue, etc.).
+          Every generated page already discloses affiliate use and marks these links <code>rel="sponsored"</code> for you.
+        </p>
+        <div id="items"></div>
+        <button class="btn btn-outline" id="addItemBtn">+ Add a gadget</button>
+      </div>
+
+      <div id="reviewFields" style="display:none;">
+        <h2 style="margin-top:28px;">3. Product details</h2>
+        <div class="two-col">
+          <div class="field">
+            <label>Product name</label>
+            <input type="text" id="rv-product-name" placeholder="MikaMax Useless Box">
+          </div>
+          <div class="field">
+            <label>Price</label>
+            <input type="text" id="rv-product-price" placeholder="€25–35">
+          </div>
+        </div>
+        <div class="field">
+          <label>Product image</label>
+          <div class="upload-row">
+            <input type="text" id="rv-product-image" placeholder="https://... or upload a file">
+            <input type="file" id="rv-product-image-file" accept="image/*" hidden>
+            <button type="button" class="btn btn-outline" id="rv-product-image-upload-btn">Upload</button>
+          </div>
+          <p class="hint" id="rv-product-image-upload-hint" style="margin-top:6px;"></p>
+        </div>
+        <div class="field">
+          <label>Buy link</label>
+          <input type="text" id="rv-product-link" placeholder="https://...">
+        </div>
+
+        <h2 style="margin-top:28px;">4. Review content</h2>
+        <div class="field">
+          <label>Introduction</label>
+          <textarea id="rv-intro" rows="4" placeholder="Opening paragraph(s) that hook the reader."></textarea>
+        </div>
+        <div class="field">
+          <label>Sections</label>
+          <p class="hint" style="margin-top:0;">
+            Start each section with <code>## Heading</code> on its own line, then the section's text below it.
+            Leave a blank line between sections. A line starting with <code>- </code> becomes a bullet point.
+          </p>
+          <textarea id="rv-sections" rows="10" placeholder="## What Is It?
+Plain text here.
+
+## How It Works
+More text, and a list:
+- first point
+- second point"></textarea>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label>Pros (one per line)</label>
+            <textarea id="rv-pros" rows="5"></textarea>
+          </div>
+          <div class="field">
+            <label>Cons (one per line)</label>
+            <textarea id="rv-cons" rows="5"></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label>Verdict — is it worth buying?</label>
+          <textarea id="rv-verdict" rows="4"></textarea>
+        </div>
+        <div class="field">
+          <label>FAQ</label>
+          <p class="hint" style="margin-top:0;">
+            Format each as <code>Q: question</code> then <code>A: answer</code> on the line(s) after it, with a
+            blank line between questions.
+          </p>
+          <textarea id="rv-faq" rows="8" placeholder="Q: Is it worth it?
+A: Yes, because...
+
+Q: Another question?
+A: Another answer."></textarea>
+        </div>
+      </div>
 
       <div class="actions-row">
         <button class="btn btn-primary" id="publishBtn">Publish to website</button>
@@ -308,6 +390,7 @@
   let activeLabelCategory = categories[0] ? categories[0].id : null;
 
   const fields = {
+    postType: document.getElementById("f-postType"),
     category: document.getElementById("f-category"),
     weekLabel: document.getElementById("f-weekLabel"),
     date: document.getElementById("f-date"),
@@ -315,6 +398,53 @@
     cover: document.getElementById("f-cover"),
     excerpt: document.getElementById("f-excerpt")
   };
+
+  function refreshPostTypeVisibility() {
+    const isReview = fields.postType.value === "review";
+    document.getElementById("listFields").style.display = isReview ? "none" : "";
+    document.getElementById("reviewFields").style.display = isReview ? "" : "none";
+  }
+  fields.postType.addEventListener("change", () => {
+    refreshPostTypeVisibility();
+    updatePreview();
+  });
+
+  function parseSections(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return [];
+    return raw.split(/\n(?=##\s)/).map(part => {
+      const lines = part.trim().split("\n");
+      const heading = lines[0].replace(/^##\s*/, "").trim();
+      const body = lines.slice(1).join("\n").trim();
+      return { heading, body };
+    }).filter(s => s.heading);
+  }
+
+  function sectionsToText(sections) {
+    return (sections || []).map(s => `## ${s.heading}\n${s.body}`).join("\n\n");
+  }
+
+  function parseFaq(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return [];
+    return raw.split(/\n(?=Q:)/).map(block => {
+      const qMatch = block.match(/^Q:\s*(.*)/);
+      const aMatch = block.match(/A:\s*([\s\S]*)/);
+      return { q: qMatch ? qMatch[1].trim() : "", a: aMatch ? aMatch[1].trim() : "" };
+    }).filter(f => f.q);
+  }
+
+  function faqToText(faq) {
+    return (faq || []).map(f => `Q: ${f.q}\nA: ${f.a}`).join("\n\n");
+  }
+
+  function parseLines(text) {
+    return String(text || "").split("\n").map(l => l.trim().replace(/^-\s*/, "")).filter(Boolean);
+  }
+
+  function linesToText(arr) {
+    return (arr || []).join("\n");
+  }
 
   function slugify(str) {
     return String(str || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -399,6 +529,8 @@
 
   function resetForm() {
     editingId = null;
+    fields.postType.value = "list";
+    refreshPostTypeVisibility();
     fields.category.value = categories[0] ? categories[0].id : "";
     fields.weekLabel.value = "";
     fields.date.value = new Date().toISOString().slice(0, 10);
@@ -407,12 +539,24 @@
     fields.excerpt.value = "";
     itemsEl.innerHTML = "";
     for (let i = 0; i < 10; i++) addItemRow();
+    document.getElementById("rv-product-name").value = "";
+    document.getElementById("rv-product-price").value = "";
+    document.getElementById("rv-product-image").value = "";
+    document.getElementById("rv-product-link").value = "";
+    document.getElementById("rv-intro").value = "";
+    document.getElementById("rv-sections").value = "";
+    document.getElementById("rv-pros").value = "";
+    document.getElementById("rv-cons").value = "";
+    document.getElementById("rv-verdict").value = "";
+    document.getElementById("rv-faq").value = "";
     document.getElementById("codeBox").style.display = "none";
     updatePreview();
   }
 
   function loadPostIntoForm(post) {
     editingId = post.id;
+    fields.postType.value = postType(post);
+    refreshPostTypeVisibility();
     fields.category.value = post.category || (categories[0] ? categories[0].id : "");
     fields.weekLabel.value = post.weekLabel || "";
     fields.date.value = post.date || "";
@@ -422,11 +566,56 @@
     itemsEl.innerHTML = "";
     (post.items || []).forEach(item => addItemRow(item));
     while (itemsEl.children.length < 10) addItemRow();
+    const product = post.product || {};
+    document.getElementById("rv-product-name").value = product.name || "";
+    document.getElementById("rv-product-price").value = product.price || "";
+    document.getElementById("rv-product-image").value = product.image || "";
+    document.getElementById("rv-product-link").value = product.buyLink || "";
+    document.getElementById("rv-intro").value = post.intro || "";
+    document.getElementById("rv-sections").value = sectionsToText(post.sections);
+    document.getElementById("rv-pros").value = linesToText(post.pros);
+    document.getElementById("rv-cons").value = linesToText(post.cons);
+    document.getElementById("rv-verdict").value = post.verdict || "";
+    document.getElementById("rv-faq").value = faqToText(post.faq);
     document.getElementById("codeBox").style.display = "none";
     updatePreview();
   }
 
   function buildPostFromForm() {
+    const type = fields.postType.value === "review" ? "review" : "list";
+    const weekLabel = fields.weekLabel.value.trim() || "Week ?";
+    const date = fields.date.value || new Date().toISOString().slice(0, 10);
+    const id = editingId || `${slugify(weekLabel)}-${date.slice(0, 4)}`;
+    const category = fields.category.value || (categories[0] ? categories[0].id : "");
+
+    const base = {
+      id,
+      category,
+      type,
+      weekLabel,
+      title: fields.title.value.trim() || "Untitled post",
+      date,
+      excerpt: fields.excerpt.value.trim()
+    };
+
+    if (type === "review") {
+      const productImage = document.getElementById("rv-product-image").value.trim();
+      base.cover = fields.cover.value.trim() || productImage;
+      base.product = {
+        name: document.getElementById("rv-product-name").value.trim(),
+        image: productImage,
+        price: document.getElementById("rv-product-price").value.trim(),
+        buyLink: document.getElementById("rv-product-link").value.trim() || "#"
+      };
+      base.intro = document.getElementById("rv-intro").value.trim();
+      base.sections = parseSections(document.getElementById("rv-sections").value);
+      base.pros = parseLines(document.getElementById("rv-pros").value);
+      base.cons = parseLines(document.getElementById("rv-cons").value);
+      base.verdict = document.getElementById("rv-verdict").value.trim();
+      base.faq = parseFaq(document.getElementById("rv-faq").value);
+      return base;
+    }
+
     const items = Array.from(itemsEl.querySelectorAll(".item-row")).map((row, i) => ({
       rank: i + 1,
       name: row.querySelector(".i-name").value.trim(),
@@ -437,26 +626,23 @@
       link: row.querySelector(".i-link").value.trim() || "#"
     })).filter(item => item.name);
 
-    const weekLabel = fields.weekLabel.value.trim() || "Week ?";
-    const date = fields.date.value || new Date().toISOString().slice(0, 10);
-    const id = editingId || `${slugify(weekLabel)}-${date.slice(0, 4)}`;
-    const category = fields.category.value || (categories[0] ? categories[0].id : "");
+    base.cover = fields.cover.value.trim() || (items[0] ? items[0].image : "");
+    base.items = items;
+    return base;
+  }
 
-    return {
-      id,
-      category,
-      weekLabel,
-      title: fields.title.value.trim() || "Untitled post",
-      date,
-      cover: fields.cover.value.trim() || (items[0] ? items[0].image : ""),
-      excerpt: fields.excerpt.value.trim(),
-      items
-    };
+  function postHasContent(post) {
+    return post.type === "review"
+      ? !!(post.intro || (post.sections && post.sections.length))
+      : !!(post.items && post.items.length);
   }
 
   function updatePreview() {
     const post = buildPostFromForm();
     const previewEl = document.getElementById("preview");
+    const bodyHtml = post.type === "review"
+      ? reviewBodyHtml(post)
+      : `<div class="item-list">${post.items.length ? post.items.map(itemCardHtml).join("") : `<p class="hint">Fill in at least one gadget's name to see it here.</p>`}</div>`;
     previewEl.innerHTML = `
       <div class="post-hero" style="padding:28px;">
         <div class="badge-row">
@@ -468,9 +654,7 @@
         <p class="lede">${escapeHtml(post.excerpt)}</p>
         ${post.cover ? `<div class="post-cover" style="aspect-ratio:16/9;"><img src="${escapeHtml(post.cover)}" alt=""></div>` : ""}
       </div>
-      <div class="item-list" style="margin-top:20px;">
-        ${post.items.length ? post.items.map(itemCardHtml).join("") : `<p class="hint">Fill in at least one gadget's name to see it here.</p>`}
-      </div>
+      <div style="margin-top:20px;">${bodyHtml}</div>
     `;
   }
 
@@ -500,7 +684,7 @@
 
   document.getElementById("saveDraftBtn").addEventListener("click", () => {
     const post = buildPostFromForm();
-    if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    if (!postHasContent(post)) { showToast(post.type === "review" ? "Add an introduction or a section first" : "Add at least one gadget first"); return; }
     editingId = post.id;
     saveDraft(post);
     refreshPicker();
@@ -553,7 +737,7 @@
 
   document.getElementById("generateBtn").addEventListener("click", () => {
     const post = buildPostFromForm();
-    if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    if (!postHasContent(post)) { showToast(post.type === "review" ? "Add an introduction or a section first" : "Add at least one gadget first"); return; }
     delete post.isDraft;
     const code = JSON.stringify(post, null, 2) + ",";
     document.getElementById("codeOutput").value = code;
@@ -806,7 +990,7 @@
 
   document.getElementById("publishBtn").addEventListener("click", async () => {
     const post = buildPostFromForm();
-    if (!post.items.length) { showToast("Add at least one gadget first"); return; }
+    if (!postHasContent(post)) { showToast(post.type === "review" ? "Add an introduction or a section first" : "Add at least one gadget first"); return; }
     if (!getToken()) {
       showToast("Connect GitHub first — see the panel above");
       document.getElementById("githubPanel").scrollIntoView({ behavior: "smooth" });
@@ -1052,6 +1236,18 @@
     document.getElementById("f-cover"),
     document.getElementById("f-cover-upload-hint")
   );
+
+  wireImageUpload(
+    document.getElementById("rv-product-image-file"),
+    document.getElementById("rv-product-image-upload-btn"),
+    document.getElementById("rv-product-image"),
+    document.getElementById("rv-product-image-upload-hint")
+  );
+
+  [
+    "rv-product-name", "rv-product-price", "rv-product-image", "rv-product-link",
+    "rv-intro", "rv-sections", "rv-pros", "rv-cons", "rv-verdict", "rv-faq"
+  ].forEach(id => document.getElementById(id).addEventListener("input", updatePreview));
 
   document.getElementById("categoryMenu").innerHTML = categoryMenuHtml("");
   wireNavDropdowns();

@@ -36,11 +36,11 @@ vm.runInContext(fs.readFileSync(path.join(BLOG_DIR, "categories.js"), "utf8"), s
 vm.runInContext("this.POSTS = POSTS; this.CATEGORIES = CATEGORIES;", sandbox);
 vm.runInContext(fs.readFileSync(path.join(BLOG_DIR, "app.js"), "utf8"), sandbox, { filename: "app.js" });
 
-const { POSTS, itemCardHtml, disclosureHtml, formatDate, escapeHtml, categoryMenuHtml } = sandbox;
+const { POSTS, disclosureHtml, formatDate, escapeHtml, categoryMenuHtml, postType, postBodyHtml } = sandbox;
 
 const posts = POSTS.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
 
-function jsonLdFor(post, url) {
+function listJsonLdFor(post, url) {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -59,6 +59,39 @@ function jsonLdFor(post, url) {
       }
     }))
   };
+}
+
+function reviewJsonLdFor(post, url) {
+  const graph = [];
+  if (post.product && post.product.name) {
+    graph.push({
+      "@type": "Review",
+      url,
+      itemReviewed: {
+        "@type": "Product",
+        name: post.product.name,
+        image: post.product.image || post.cover
+      },
+      author: { "@type": "Organization", name: "gadgetweekly" },
+      datePublished: post.date,
+      reviewBody: post.excerpt
+    });
+  }
+  if (post.faq && post.faq.length) {
+    graph.push({
+      "@type": "FAQPage",
+      mainEntity: post.faq.map(f => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a }
+      }))
+    });
+  }
+  return { "@context": "https://schema.org", "@graph": graph };
+}
+
+function jsonLdFor(post, url) {
+  return postType(post) === "review" ? reviewJsonLdFor(post, url) : listJsonLdFor(post, url);
 }
 
 function pageHtml(post) {
@@ -121,9 +154,7 @@ ${jsonLd}
     ${disclosureHtml("../")}
   </div>
 
-  <div class="item-list">
-    ${post.items.map(itemCardHtml).join("\n")}
-  </div>
+  ${postBodyHtml(post)}
 
   <div class="archive-nav">
     ${prev ? `<a class="btn btn-outline" href="${prev.id}.html">&larr; ${escapeHtml(prev.weekLabel)}</a>` : "<span></span>"}

@@ -141,3 +141,99 @@ function disclosureHtml(prefix) {
   prefix = prefix || "";
   return `<p class="disclosure">This post contains affiliate links. If you buy something through one, we may earn a small commission at no extra cost to you. <a href="${prefix}disclosure.html">Learn more</a>.</p>`;
 }
+
+function postType(post) {
+  return post.type === "review" ? "review" : "list";
+}
+
+/* Turns a block of plain text into paragraphs and bullet lists: blank lines
+   separate paragraphs, and consecutive lines starting with "- " become a
+   <ul>. Used for admin-authored review text instead of accepting raw HTML. */
+function textBlockHtml(text) {
+  const lines = String(text || "").split("\n");
+  let html = "";
+  let paraLines = [];
+  let listItems = [];
+
+  function flushPara() {
+    if (paraLines.length) {
+      html += `<p>${paraLines.map(escapeHtml).join("<br>")}</p>`;
+      paraLines = [];
+    }
+  }
+  function flushList() {
+    if (listItems.length) {
+      html += `<ul>${listItems.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
+      listItems = [];
+    }
+  }
+
+  lines.forEach(rawLine => {
+    const line = rawLine.trim();
+    if (!line) { flushPara(); flushList(); return; }
+    if (line.startsWith("- ")) { flushPara(); listItems.push(line.slice(2)); }
+    else { flushList(); paraLines.push(line); }
+  });
+  flushPara();
+  flushList();
+  return html;
+}
+
+function productBoxHtml(product) {
+  if (!product || (!product.name && !product.buyLink)) return "";
+  return `
+    <div class="product-box">
+      ${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name || "")}">` : ""}
+      <div class="product-box-info">
+        ${product.name ? `<h3>${escapeHtml(product.name)}</h3>` : ""}
+        ${product.price ? `<div class="product-box-price">${escapeHtml(product.price)}</div>` : ""}
+        ${product.buyLink ? `<a class="btn btn-primary" href="${escapeHtml(product.buyLink)}" target="_blank" rel="sponsored noopener">View deal</a>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+/* Renders a "review" type post: intro, a product callout box, freeform
+   sections (each with a heading), a pros/cons grid, a verdict, and an FAQ
+   list — the long-form counterpart to itemCardHtml's ranked gadget cards. */
+function reviewBodyHtml(post) {
+  const sectionsHtml = (post.sections || []).map(s => `
+    <h2>${escapeHtml(s.heading)}</h2>
+    ${textBlockHtml(s.body)}
+  `).join("");
+
+  const hasPros = post.pros && post.pros.length;
+  const hasCons = post.cons && post.cons.length;
+  const prosConsHtml = (hasPros || hasCons) ? `
+    <div class="pros-cons">
+      ${hasPros ? `<div class="pros"><h3>Pros</h3><ul>${post.pros.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul></div>` : ""}
+      ${hasCons ? `<div class="cons"><h3>Cons</h3><ul>${post.cons.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}
+    </div>
+  ` : "";
+
+  const faqHtml = (post.faq && post.faq.length) ? `
+    <h2>Frequently Asked Questions</h2>
+    <div class="faq-list">
+      ${post.faq.map(f => `<div class="faq-item"><h3>${escapeHtml(f.q)}</h3>${textBlockHtml(f.a)}</div>`).join("")}
+    </div>
+  ` : "";
+
+  return `
+    <div class="review-body">
+      ${textBlockHtml(post.intro)}
+      ${productBoxHtml(post.product)}
+      ${sectionsHtml}
+      ${prosConsHtml}
+      ${post.verdict ? `<h2>Is It Worth Buying?</h2>${textBlockHtml(post.verdict)}` : ""}
+      ${faqHtml}
+    </div>
+  `;
+}
+
+/* Renders whichever body a post needs — the ranked gadget list for "list"
+   posts, or the long-form review layout for "review" posts. */
+function postBodyHtml(post) {
+  return postType(post) === "review"
+    ? reviewBodyHtml(post)
+    : `<div class="item-list">${(post.items || []).map(itemCardHtml).join("")}</div>`;
+}
